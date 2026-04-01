@@ -1,11 +1,11 @@
 from models.database import DatabaseManager
 
 
-def create_project(name: str, path: str, description: str = "") -> int:
+def create_project(name: str, path: str, description: str = "", conda_env: str = "") -> int:
     db = DatabaseManager()
     cursor = db.execute(
-        "INSERT INTO projects (name, path, description) VALUES (?, ?, ?)",
-        (name, path, description),
+        "INSERT INTO projects (name, path, description, conda_env) VALUES (?, ?, ?, ?)",
+        (name, path, description, conda_env),
     )
     return cursor.lastrowid
 
@@ -24,7 +24,7 @@ def get_project(project_id: int) -> dict | None:
 
 def update_project(project_id: int, **kwargs) -> None:
     db = DatabaseManager()
-    allowed = {"name", "path", "description", "status"}
+    allowed = {"name", "path", "description", "status", "conda_env"}
     fields = {k: v for k, v in kwargs.items() if k in allowed}
     if not fields:
         return

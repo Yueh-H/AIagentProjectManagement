@@ -296,6 +296,7 @@ class ProjectDetailView(QWidget):
             max_turns=max_turns,
             session_id=session_id,
             permission_mode=permission_mode,
+            conda_env=project.get("conda_env", ""),
         )
         panel.execution_id = execution_id
         self._exec_to_panel[execution_id] = panel

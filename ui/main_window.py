@@ -93,7 +93,9 @@ class MainWindow(QMainWindow):
         dialog = NewProjectDialog(self)
         if dialog.exec():
             data = dialog.get_data()
-            project_model.create_project(data["name"], data["path"], data["description"])
+            project_model.create_project(
+                data["name"], data["path"], data["description"], data.get("conda_env", "")
+            )
             self._refresh_all()
 
     def _delete_project(self, project_id: int):

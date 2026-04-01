@@ -28,6 +28,7 @@ class SessionManager(QObject):
         allowed_tools: list[str] | None = None,
         max_turns: int | None = None,
         permission_mode: str = "dangerously-skip-permissions",
+        conda_env: str = "",
     ) -> int:
         execution_id = exec_model.create_execution(task_id, prompt, agent_id=agent_id)
         task_model.update_task(task_id, status="running")
@@ -65,6 +66,7 @@ class SessionManager(QObject):
             allowed_tools=allowed_tools,
             max_turns=max_turns,
             permission_mode=permission_mode,
+            conda_env=conda_env,
         )
         self.execution_started.emit(execution_id)
         return execution_id

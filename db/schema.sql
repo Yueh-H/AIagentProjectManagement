@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS projects (
     name        TEXT NOT NULL,
     path        TEXT NOT NULL,
     description TEXT DEFAULT '',
+    conda_env   TEXT DEFAULT '',
     status      TEXT DEFAULT 'idle'
         CHECK(status IN ('idle','running','completed','failed')),
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

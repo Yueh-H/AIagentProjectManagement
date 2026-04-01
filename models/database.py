@@ -34,14 +34,25 @@ class DatabaseManager:
     def _migrate(self):
         """Run incremental migrations for existing databases."""
         # Add agent_id column to executions if missing
-        columns = [
+        exec_cols = [
             row["name"]
             for row in self._conn.execute("PRAGMA table_info(executions)").fetchall()
         ]
-        if "agent_id" not in columns:
+        if "agent_id" not in exec_cols:
             self._conn.execute(
                 "ALTER TABLE executions ADD COLUMN agent_id INTEGER "
                 "REFERENCES agents(id) ON DELETE SET NULL"
+            )
+            self._conn.commit()
+
+        # Add conda_env column to projects if missing
+        proj_cols = [
+            row["name"]
+            for row in self._conn.execute("PRAGMA table_info(projects)").fetchall()
+        ]
+        if "conda_env" not in proj_cols:
+            self._conn.execute(
+                "ALTER TABLE projects ADD COLUMN conda_env TEXT DEFAULT ''"
             )
             self._conn.commit()
 

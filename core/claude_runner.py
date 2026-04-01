@@ -25,21 +25,30 @@ class ClaudeRunner(QObject):
         allowed_tools: list[str] | None = None,
         max_turns: int | None = None,
         permission_mode: str = "dangerously-skip-permissions",
+        conda_env: str = "",
     ):
-        args = ["-p", prompt, "--output-format", "stream-json", "--verbose"]
+        claude_args = ["-p", prompt, "--output-format", "stream-json", "--verbose"]
         if permission_mode and permission_mode != "default":
             if permission_mode == "dangerously-skip-permissions":
-                args += ["--dangerously-skip-permissions"]
+                claude_args += ["--dangerously-skip-permissions"]
             elif permission_mode == "accept-edits":
-                args += ["--permission-mode", "acceptEdits"]
+                claude_args += ["--permission-mode", "acceptEdits"]
             elif permission_mode == "plan":
-                args += ["--permission-mode", "plan"]
+                claude_args += ["--permission-mode", "plan"]
         if session_id:
-            args += ["--resume", session_id]
+            claude_args += ["--resume", session_id]
         if allowed_tools:
-            args += ["--allowedTools", ",".join(allowed_tools)]
+            claude_args += ["--allowedTools", ",".join(allowed_tools)]
         if max_turns:
-            args += ["--max-turns", str(max_turns)]
+            claude_args += ["--max-turns", str(max_turns)]
+
+        # If conda_env is set, wrap with `conda run`
+        if conda_env:
+            program = "conda"
+            args = ["run", "-n", conda_env, "--no-banner", "claude"] + claude_args
+        else:
+            program = "claude"
+            args = claude_args
 
         self._process = QProcess(self)
         self._process.setWorkingDirectory(working_dir)
@@ -47,7 +56,7 @@ class ClaudeRunner(QObject):
         self._process.readyReadStandardError.connect(self._on_stderr)
         self._process.finished.connect(self._on_finished)
         self._process.errorOccurred.connect(self._on_error)
-        self._process.start("claude", args)
+        self._process.start(program, args)
 
     def _on_stdout(self):
         data = self._process.readAllStandardOutput().data().decode("utf-8", errors="replace")
