@@ -4,6 +4,7 @@ from core.output_parser import StreamEvent
 from models import execution as exec_model
 from models import task as task_model
 from models import project as project_model
+from models import agent as agent_model
 from datetime import datetime
 
 
@@ -21,12 +22,18 @@ class SessionManager(QObject):
         task_id: int,
         prompt: str,
         working_dir: str,
+        agent_id: int | None = None,
         session_id: str | None = None,
         allowed_tools: list[str] | None = None,
         max_turns: int | None = None,
+        permission_mode: str = "dangerously-skip-permissions",
     ) -> int:
-        execution_id = exec_model.create_execution(task_id, prompt)
+        execution_id = exec_model.create_execution(task_id, prompt, agent_id=agent_id)
         task_model.update_task(task_id, status="running")
+
+        # Update agent status
+        if agent_id:
+            agent_model.update_agent(agent_id, status="running")
 
         # Update project status
         task = task_model.get_task(task_id)
@@ -56,6 +63,7 @@ class SessionManager(QObject):
             session_id=session_id,
             allowed_tools=allowed_tools,
             max_turns=max_turns,
+            permission_mode=permission_mode,
         )
         self.execution_started.emit(execution_id)
         return execution_id
@@ -65,6 +73,10 @@ class SessionManager(QObject):
 
     def _on_started(self, execution_id: int, session_id: str):
         exec_model.update_execution(execution_id, session_id=session_id)
+        # Also save session_id to the agent
+        execution = exec_model.get_execution(execution_id)
+        if execution and execution.get("agent_id"):
+            agent_model.update_agent(execution["agent_id"], session_id=session_id)
 
     def _on_finished(
         self, execution_id: int, session_id: str, success: bool, result_text: str
@@ -78,11 +90,19 @@ class SessionManager(QObject):
             finished_at=datetime.now().isoformat(),
         )
 
-        # Update task status
         execution = exec_model.get_execution(execution_id)
         if execution:
-            task_status = "completed" if success else "failed"
-            task_model.update_task(execution["task_id"], status=task_status)
+            # Update agent status
+            if execution.get("agent_id"):
+                agent_status = "completed" if success else "failed"
+                agent_model.update_agent(
+                    execution["agent_id"],
+                    status=agent_status,
+                    session_id=session_id,
+                )
+
+            # Update task status based on all its agents
+            self._update_task_status(execution["task_id"])
 
             # Recalculate project status
             task = task_model.get_task(execution["task_id"])
@@ -103,6 +123,24 @@ class SessionManager(QObject):
             status="error",
             finished_at=datetime.now().isoformat(),
         )
+        execution = exec_model.get_execution(execution_id)
+        if execution and execution.get("agent_id"):
+            agent_model.update_agent(execution["agent_id"], status="failed")
+
+    def _update_task_status(self, task_id: int):
+        """Recalculate task status based on its agents."""
+        agents = agent_model.get_agents_by_task(task_id)
+        if not agents:
+            return
+        statuses = [a["status"] for a in agents]
+        if any(s == "running" for s in statuses):
+            task_model.update_task(task_id, status="running")
+        elif all(s == "completed" for s in statuses):
+            task_model.update_task(task_id, status="completed")
+        elif any(s == "failed" for s in statuses):
+            task_model.update_task(task_id, status="failed")
+        else:
+            task_model.update_task(task_id, status="pending")
 
     def _update_project_status(self, project_id: int):
         tasks = task_model.get_tasks_by_project(project_id)

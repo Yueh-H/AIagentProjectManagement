@@ -29,6 +29,21 @@ class DatabaseManager:
         with open(schema_path, "r") as f:
             self._conn.executescript(f.read())
         self._conn.commit()
+        self._migrate()
+
+    def _migrate(self):
+        """Run incremental migrations for existing databases."""
+        # Add agent_id column to executions if missing
+        columns = [
+            row["name"]
+            for row in self._conn.execute("PRAGMA table_info(executions)").fetchall()
+        ]
+        if "agent_id" not in columns:
+            self._conn.execute(
+                "ALTER TABLE executions ADD COLUMN agent_id INTEGER "
+                "REFERENCES agents(id) ON DELETE SET NULL"
+            )
+            self._conn.commit()
 
     @property
     def conn(self) -> sqlite3.Connection:

@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 CREATE TABLE IF NOT EXISTS executions (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     task_id       INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    agent_id      INTEGER REFERENCES agents(id) ON DELETE SET NULL,
     session_id    TEXT,
     prompt        TEXT NOT NULL,
     result_text   TEXT DEFAULT '',
@@ -37,5 +38,16 @@ CREATE TABLE IF NOT EXISTS executions (
     finished_at   TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS agents (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id     INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    name        TEXT NOT NULL DEFAULT 'Agent 1',
+    session_id  TEXT,
+    status      TEXT DEFAULT 'idle'
+        CHECK(status IN ('idle','running','completed','failed')),
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
+CREATE INDEX IF NOT EXISTS idx_agents_task ON agents(task_id);
 CREATE INDEX IF NOT EXISTS idx_executions_task ON executions(task_id);

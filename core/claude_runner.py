@@ -24,8 +24,16 @@ class ClaudeRunner(QObject):
         session_id: str | None = None,
         allowed_tools: list[str] | None = None,
         max_turns: int | None = None,
+        permission_mode: str = "dangerously-skip-permissions",
     ):
         args = ["-p", prompt, "--output-format", "stream-json", "--verbose"]
+        if permission_mode and permission_mode != "default":
+            if permission_mode == "dangerously-skip-permissions":
+                args += ["--dangerously-skip-permissions"]
+            elif permission_mode == "accept-edits":
+                args += ["--permission-mode", "acceptEdits"]
+            elif permission_mode == "plan":
+                args += ["--permission-mode", "plan"]
         if session_id:
             args += ["--resume", session_id]
         if allowed_tools:

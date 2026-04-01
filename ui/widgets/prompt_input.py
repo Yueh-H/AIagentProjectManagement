@@ -1,13 +1,20 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPlainTextEdit,
-    QPushButton, QSpinBox, QLabel,
+    QPushButton, QSpinBox, QLabel, QCheckBox, QComboBox,
 )
 from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QKeyEvent
 
+PERMISSION_MODES = [
+    ("自動跳過權限", "dangerously-skip-permissions"),
+    ("自動接受編輯", "accept-edits"),
+    ("規劃模式（唯讀）", "plan"),
+    ("預設（需確認）", "default"),
+]
+
 
 class PromptInput(QWidget):
-    prompt_submitted = pyqtSignal(str, int)  # prompt, max_turns
+    prompt_submitted = pyqtSignal(str, int, bool, str)  # prompt, max_turns, continue_session, permission_mode
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -30,6 +37,34 @@ class PromptInput(QWidget):
         # Controls row
         controls = QHBoxLayout()
 
+        # Continue session checkbox
+        self._continue_cb = QCheckBox("繼續對話")
+        self._continue_cb.setChecked(True)
+        self._continue_cb.setToolTip(
+            "勾選時會使用上次的 session_id (--resume)，"
+            "讓 Claude 記得之前的對話內容"
+        )
+        self._continue_cb.setStyleSheet("font-size: 13px;")
+        controls.addWidget(self._continue_cb)
+
+        controls.addSpacing(12)
+
+        # Permission mode
+        controls.addWidget(QLabel("權限:"))
+        self._perm_combo = QComboBox()
+        for label, value in PERMISSION_MODES:
+            self._perm_combo.addItem(label, value)
+        self._perm_combo.setToolTip(
+            "自動跳過權限：不需確認任何操作（適合信任的專案）\n"
+            "自動接受編輯：自動接受檔案修改，其他操作需確認\n"
+            "規劃模式：Claude 只能讀取，不能修改\n"
+            "預設：所有操作都需確認（會卡住，不建議）"
+        )
+        self._perm_combo.setStyleSheet("font-size: 13px;")
+        self._perm_combo.setFixedWidth(160)
+        controls.addWidget(self._perm_combo)
+
+        controls.addSpacing(12)
         controls.addWidget(QLabel("最大回合:"))
         self._max_turns = QSpinBox()
         self._max_turns.setRange(1, 100)
@@ -64,7 +99,10 @@ class PromptInput(QWidget):
     def _on_submit(self):
         text = self._text_edit.toPlainText().strip()
         if text:
-            self.prompt_submitted.emit(text, self._max_turns.value())
+            perm_mode = self._perm_combo.currentData()
+            self.prompt_submitted.emit(
+                text, self._max_turns.value(), self._continue_cb.isChecked(), perm_mode
+            )
 
     def set_running(self, running: bool):
         self._run_btn.setEnabled(not running)
