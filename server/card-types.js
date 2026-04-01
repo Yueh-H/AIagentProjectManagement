@@ -2,18 +2,21 @@ const CARD_FIELDS = Object.freeze({
   markdown: ['markdown'],
   project: ['objective', 'successCriteria', 'nextAction', 'notes'],
   'agent-output': ['sourcePaneId', 'agentName'],
+  mission: ['goal', 'completionCriteria', 'statusSummary', 'blockers', 'nextStep', 'sourcePaneId', 'status', 'statusUpdatedAt', 'instruction', 'doneCriteria', 'resultSummary'],
 });
 
 const CARD_DEFAULT_TITLES = Object.freeze({
   markdown: 'Document.md',
   project: 'Project Overview',
   'agent-output': 'Agent Output',
+  mission: 'Mission',
 });
 
 const CARD_DEFAULT_BOUNDS = Object.freeze({
   markdown: { width: 520, height: 360 },
   project: { width: 460, height: 360 },
   'agent-output': { width: 480, height: 320 },
+  mission: { width: 460, height: 480 },
 });
 
 const API_CARD_TYPES = Object.freeze(Object.keys(CARD_FIELDS));

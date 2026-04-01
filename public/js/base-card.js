@@ -176,8 +176,12 @@ class BaseCard {
     this._hoverResizeHandle = null;
     this._titleEditing = false;
     this._isActive = false;
+    this._isSelected = false;
     this._contentInteractionPrimed = false;
     this.colorTheme = 'default';
+    this.onGroupDragStart = null;
+    this.onGroupDragMove = null;
+    this.onGroupDragEnd = null;
 
     // -- Gesture manager for this card --
     this._gestures = new GestureManager();
@@ -276,6 +280,7 @@ class BaseCard {
 
   _registerHeaderGestures() {
     let dragStartBounds = null;
+    let groupDragSession = null;
     const defaultDragThreshold = window.WorkspaceConfig?.gesture?.dragThreshold ?? 4;
 
     this._gestures.zone(this.headerEl, {
@@ -314,16 +319,29 @@ class BaseCard {
         this._requestCardFocus();
         this._clearContentInteraction();
         this._releaseInteractiveFocus(e.target);
-        dragStartBounds = this.getBounds();
+        groupDragSession = typeof this.onGroupDragStart === 'function'
+          ? this.onGroupDragStart(this.paneId)
+          : null;
+        dragStartBounds = groupDragSession ? null : this.getBounds();
         document.body.classList.add('is-dragging-pane');
         document.body.classList.add('is-dragging-card');
       },
 
       onDrag: (e, delta) => {
-        if (!dragStartBounds) return;
         const zoom = this.getContainerRect().zoom || 1;
+        const deltaX = delta.x / zoom;
+        const deltaY = delta.y / zoom;
+
+        if (groupDragSession) {
+          if (typeof this.onGroupDragMove === 'function') {
+            this.onGroupDragMove(this.paneId, groupDragSession, deltaX, deltaY);
+          }
+          return;
+        }
+
+        if (!dragStartBounds) return;
         const nextBounds = window.PaneGeometry.translatePaneBounds(
-          dragStartBounds, delta.x / zoom, delta.y / zoom, this.getContainerRect()
+          dragStartBounds, deltaX, deltaY, this.getContainerRect()
         );
         this.setBounds(nextBounds, { notify: false, fit: false });
       },
@@ -331,6 +349,15 @@ class BaseCard {
       onDragEnd: () => {
         document.body.classList.remove('is-dragging-pane');
         document.body.classList.remove('is-dragging-card');
+        if (groupDragSession) {
+          const session = groupDragSession;
+          groupDragSession = null;
+          dragStartBounds = null;
+          if (typeof this.onGroupDragEnd === 'function') {
+            this.onGroupDragEnd(this.paneId, session);
+          }
+          return;
+        }
         dragStartBounds = null;
         this.scheduleFit();
         this._emitBoundsCommit();
@@ -456,21 +483,35 @@ class BaseCard {
 
   _registerBodyDrag() {
     let dragStartBounds = null;
+    let groupDragSession = null;
     const defaultDragThreshold = window.WorkspaceConfig?.gesture?.dragThreshold ?? 4;
 
     const startDrag = (e) => {
       this._requestCardFocus();
       this._releaseInteractiveFocus(e.target);
-      dragStartBounds = this.getBounds();
+      groupDragSession = typeof this.onGroupDragStart === 'function'
+        ? this.onGroupDragStart(this.paneId)
+        : null;
+      dragStartBounds = groupDragSession ? null : this.getBounds();
       document.body.classList.add('is-dragging-pane');
       document.body.classList.add('is-dragging-card');
     };
 
     const moveDrag = (e, delta) => {
-      if (!dragStartBounds) return;
       const zoom = this.getContainerRect().zoom || 1;
+      const deltaX = delta.x / zoom;
+      const deltaY = delta.y / zoom;
+
+      if (groupDragSession) {
+        if (typeof this.onGroupDragMove === 'function') {
+          this.onGroupDragMove(this.paneId, groupDragSession, deltaX, deltaY);
+        }
+        return;
+      }
+
+      if (!dragStartBounds) return;
       const nextBounds = window.PaneGeometry.translatePaneBounds(
-        dragStartBounds, delta.x / zoom, delta.y / zoom, this.getContainerRect()
+        dragStartBounds, deltaX, deltaY, this.getContainerRect()
       );
       this.setBounds(nextBounds, { notify: false, fit: false });
     };
@@ -478,6 +519,15 @@ class BaseCard {
     const endDrag = () => {
       document.body.classList.remove('is-dragging-pane');
       document.body.classList.remove('is-dragging-card');
+      if (groupDragSession) {
+        const session = groupDragSession;
+        groupDragSession = null;
+        dragStartBounds = null;
+        if (typeof this.onGroupDragEnd === 'function') {
+          this.onGroupDragEnd(this.paneId, session);
+        }
+        return;
+      }
       dragStartBounds = null;
       this.scheduleFit();
       this._emitBoundsCommit();
@@ -739,6 +789,11 @@ class BaseCard {
       this._clearContentInteraction();
     }
     this.el.classList.toggle('active', isActive);
+  }
+
+  setSelected(isSelected) {
+    this._isSelected = Boolean(isSelected);
+    this.el.classList.toggle('selected', this._isSelected);
   }
 
   dispose() {

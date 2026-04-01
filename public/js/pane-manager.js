@@ -11,11 +11,17 @@ class PaneManager {
     this._hydrated = false;
     this._cardRegistry = new Map();
     this._runtimeByPaneId = new Map();
+    this._selectedPaneIds = new Set();
 
     // Create the infinite canvas element inside the container
     this.canvas = document.createElement('div');
     this.canvas.className = 'workspace-canvas';
     this.container.appendChild(this.canvas);
+
+    this._selectionMarquee = document.createElement('div');
+    this._selectionMarquee.className = 'selection-marquee';
+    this._selectionMarquee.hidden = true;
+    this.container.appendChild(this._selectionMarquee);
 
     // Canvas pan & zoom (CSS transform based, no scrollbars)
     this._panX = 0;
@@ -206,6 +212,134 @@ class PaneManager {
     this._zoomIndicator.textContent = `${Math.round(this._zoom * 100)}%`;
   }
 
+  _focusPane(paneId, options = {}) {
+    const preserveSelection = options.preserveSelection
+      ?? (this._selectedPaneIds.size > 1 && this._selectedPaneIds.has(paneId));
+    this.setActive(paneId, { ...options, preserveSelection });
+  }
+
+  _setSelectedPaneIds(ids = []) {
+    const nextIds = Array.from(new Set(ids.filter((id) => this.panes.has(id))));
+    const next = new Set(nextIds);
+    const prev = this._selectedPaneIds;
+    let changed = next.size !== prev.size;
+
+    if (!changed) {
+      for (const id of next) {
+        if (!prev.has(id)) {
+          changed = true;
+          break;
+        }
+      }
+    }
+
+    if (!changed) return;
+
+    this._selectedPaneIds = next;
+    for (const [paneId, pane] of this.panes.entries()) {
+      pane.setSelected?.(next.has(paneId));
+    }
+  }
+
+  _removeSelectedPaneId(paneId) {
+    if (!this._selectedPaneIds.has(paneId)) return;
+    this._setSelectedPaneIds(Array.from(this._selectedPaneIds).filter((id) => id !== paneId));
+  }
+
+  _rectsIntersect(a, b) {
+    return a.x < (b.x + b.width)
+      && (a.x + a.width) > b.x
+      && a.y < (b.y + b.height)
+      && (a.y + a.height) > b.y;
+  }
+
+  _getPaneIdsIntersectingRect(rect) {
+    if (!rect || rect.width <= 0 || rect.height <= 0) return [];
+
+    return Array.from(this.panes.values())
+      .filter((pane) => this._rectsIntersect(rect, pane.getBounds()))
+      .map((pane) => pane.paneId);
+  }
+
+  _setSelectionMarqueeFromScreenPoints(startClientX, startClientY, endClientX, endClientY) {
+    const rect = this.container.getBoundingClientRect();
+    const left = Math.min(startClientX, endClientX) - rect.left;
+    const top = Math.min(startClientY, endClientY) - rect.top;
+    const width = Math.abs(endClientX - startClientX);
+    const height = Math.abs(endClientY - startClientY);
+
+    this._selectionMarquee.hidden = false;
+    this._selectionMarquee.style.left = `${Math.round(left)}px`;
+    this._selectionMarquee.style.top = `${Math.round(top)}px`;
+    this._selectionMarquee.style.width = `${Math.round(width)}px`;
+    this._selectionMarquee.style.height = `${Math.round(height)}px`;
+  }
+
+  _hideSelectionMarquee() {
+    this._selectionMarquee.hidden = true;
+    this._selectionMarquee.style.width = '0px';
+    this._selectionMarquee.style.height = '0px';
+  }
+
+  _getCanvasRectFromScreenPoints(startClientX, startClientY, endClientX, endClientY) {
+    const start = this._screenToCanvas(startClientX, startClientY);
+    const end = this._screenToCanvas(endClientX, endClientY);
+    const left = Math.min(start.x, end.x);
+    const top = Math.min(start.y, end.y);
+    const right = Math.max(start.x, end.x);
+    const bottom = Math.max(start.y, end.y);
+
+    return {
+      x: left,
+      y: top,
+      width: right - left,
+      height: bottom - top,
+    };
+  }
+
+  _beginSelectedGroupDrag(originPaneId) {
+    if (!this._selectedPaneIds.has(originPaneId) || this._selectedPaneIds.size < 2) {
+      return null;
+    }
+
+    const paneIds = Array.from(this._selectedPaneIds).filter((paneId) => this.panes.has(paneId));
+    if (paneIds.length < 2) return null;
+
+    return {
+      paneIds,
+      startBounds: new Map(paneIds.map((paneId) => [paneId, this.panes.get(paneId).getBounds()])),
+    };
+  }
+
+  _updateSelectedGroupDrag(_originPaneId, session, deltaX, deltaY) {
+    if (!session?.paneIds?.length) return;
+
+    session.paneIds.forEach((paneId) => {
+      const pane = this.panes.get(paneId);
+      const startBounds = session.startBounds.get(paneId);
+      if (!pane || !startBounds) return;
+
+      const nextBounds = window.PaneGeometry.translatePaneBounds(
+        startBounds,
+        deltaX,
+        deltaY,
+        this._getContainerRect()
+      );
+      pane.setBounds(nextBounds, { notify: false, fit: false });
+    });
+  }
+
+  _endSelectedGroupDrag(_originPaneId, session) {
+    if (!session?.paneIds?.length) return;
+
+    session.paneIds.forEach((paneId) => {
+      const pane = this.panes.get(paneId);
+      pane?.scheduleFit();
+    });
+    this._persistLayout();
+    this._refreshWorkspaceCards();
+  }
+
   // ── Context menu (right-click to add cards) ──
 
   _screenToCanvas(clientX, clientY) {
@@ -377,6 +511,8 @@ class PaneManager {
   _initCanvasPan() {
     let panning = false;
     let didMove = false;
+    let selecting = false;
+    let didSelectMove = false;
     let contextMenuMode = null;
     let contextPaneId = null;
     let wheelPanTimer = null;
@@ -422,6 +558,48 @@ class PaneManager {
       window.addEventListener('pointercancel', onUp);
     };
 
+    const onSelectionMove = (e) => {
+      if (!selecting) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+
+      if (!didSelectMove && (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)) {
+        didSelectMove = true;
+        document.body.classList.add('is-marquee-selecting');
+        this.setActive(null, { preserveDomFocus: true, preserveSelection: true });
+      }
+
+      if (!didSelectMove) return;
+
+      this._setSelectionMarqueeFromScreenPoints(startX, startY, e.clientX, e.clientY);
+      const selectionRect = this._getCanvasRectFromScreenPoints(startX, startY, e.clientX, e.clientY);
+      this._setSelectedPaneIds(this._getPaneIdsIntersectingRect(selectionRect));
+    };
+
+    const onSelectionUp = () => {
+      window.removeEventListener('pointermove', onSelectionMove);
+      window.removeEventListener('pointerup', onSelectionUp);
+      window.removeEventListener('pointercancel', onSelectionUp);
+      this._hideSelectionMarquee();
+      document.body.classList.remove('is-marquee-selecting');
+
+      if (!selecting) return;
+
+      if (didSelectMove) {
+        const selectedIds = Array.from(this._selectedPaneIds);
+        if (selectedIds.length === 1) {
+          this.setActive(selectedIds[0], { preserveDomFocus: true, preserveSelection: true });
+        } else {
+          this.setActive(null, { preserveDomFocus: true, preserveSelection: true });
+        }
+      } else {
+        this.setActive(null, { preserveDomFocus: true });
+      }
+
+      selecting = false;
+      didSelectMove = false;
+    };
+
     const onMove = (e) => {
       if (!panning) return;
       const dx = e.clientX - startX;
@@ -464,7 +642,16 @@ class PaneManager {
       if (e.button !== 0) return;
       if (e.target.closest('.pane-wrapper')) return;
       if (this._ctxMenu?.contains(e.target)) return;
-      this.setActive(null, { preserveDomFocus: true });
+
+      this._hideContextMenu();
+      selecting = true;
+      didSelectMove = false;
+      startX = e.clientX;
+      startY = e.clientY;
+
+      window.addEventListener('pointermove', onSelectionMove);
+      window.addEventListener('pointerup', onSelectionUp);
+      window.addEventListener('pointercancel', onSelectionUp);
     });
     this.container.addEventListener('pointerdown', onDown);
 
@@ -608,7 +795,7 @@ class PaneManager {
       data,
       getContainerRect: () => this._getContainerRect(),
       onBoundsCommit: (paneId) => this._handlePaneMutation(paneId),
-      onFocus: (paneId, options) => this.setActive(paneId, options),
+      onFocus: (paneId, options) => this._focusPane(paneId, options),
       onRequestClose: (paneId) => this.closePane(paneId),
       onRuntimeChange: (paneId, runtime) => {
         this._runtimeByPaneId.set(paneId, runtime);
@@ -617,6 +804,10 @@ class PaneManager {
       onRequestFocusCard: (paneId) => this.setActive(paneId),
     });
     pane.hydrateUiState?.(data);
+    pane.onGroupDragStart = (paneId) => this._beginSelectedGroupDrag(paneId);
+    pane.onGroupDragMove = (paneId, session, deltaX, deltaY) => this._updateSelectedGroupDrag(paneId, session, deltaX, deltaY);
+    pane.onGroupDragEnd = (paneId, session) => this._endSelectedGroupDrag(paneId, session);
+    pane.setSelected?.(this._selectedPaneIds.has(id));
 
     this.panes.set(id, pane);
     this.canvas.appendChild(pane.getElement());
@@ -655,9 +846,13 @@ class PaneManager {
     return pane;
   }
 
-  setActive(id, { preserveDomFocus = false } = {}) {
+  setActive(id, { preserveDomFocus = false, preserveSelection = false } = {}) {
     const nextId = id && this.panes.has(id) ? id : null;
     const isSamePane = this.activePaneId === nextId;
+
+    if (!preserveSelection) {
+      this._setSelectedPaneIds(nextId ? [nextId] : []);
+    }
 
     if (this.activePaneId && !isSamePane) {
       const prev = this.panes.get(this.activePaneId);
@@ -709,6 +904,7 @@ class PaneManager {
     const pane = this.panes.get(id);
     if (!pane) return;
     this._hideContextMenu();
+    this._removeSelectedPaneId(id);
 
     const wasActive = this.activePaneId === id;
     pane.dispose();
@@ -754,6 +950,7 @@ class PaneManager {
   _hydrateFromState(state) {
     if (this._hydrated) return;
     this._hydrated = true;
+    this._setSelectedPaneIds([]);
 
     for (const pane of this.panes.values()) {
       pane.dispose();
@@ -865,6 +1062,7 @@ class PaneManager {
 
     const pane = this.panes.get(paneId);
     if (pane?.cardType === 'terminal') return;
+    this._removeSelectedPaneId(paneId);
 
     const wasActive = this.activePaneId === paneId;
     pane.dispose();
@@ -888,4 +1086,10 @@ class PaneManager {
   }
 }
 
-window.PaneManager = PaneManager;
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = PaneManager;
+}
+
+if (typeof window !== 'undefined') {
+  window.PaneManager = PaneManager;
+}
