@@ -246,11 +246,17 @@ class ProjectDetailView(QWidget):
                 if p is not panel
             }
             self._agent_tabs.removeTab(index)
+            panel.setParent(None)
+            panel.deleteLater()
 
     def _clear_agent_tabs(self):
         self._exec_to_panel.clear()
         while self._agent_tabs.count() > 0:
+            widget = self._agent_tabs.widget(0)
             self._agent_tabs.removeTab(0)
+            if widget:
+                widget.setParent(None)
+                widget.deleteLater()
 
     def _show_placeholder(self, show: bool):
         self._placeholder.setVisible(show)

@@ -5,6 +5,7 @@ from models import execution as exec_model
 from models import task as task_model
 from models import project as project_model
 from models import agent as agent_model
+from core.notifier import notify
 from datetime import datetime
 
 
@@ -108,6 +109,23 @@ class SessionManager(QObject):
             task = task_model.get_task(execution["task_id"])
             if task:
                 self._update_project_status(task["project_id"])
+
+            # Send macOS notification
+            agent_name = ""
+            if execution.get("agent_id"):
+                agent = agent_model.get_agent(execution["agent_id"])
+                agent_name = f" ({agent['name']})" if agent else ""
+            task_title = task["title"] if task else "任務"
+            if success:
+                notify(
+                    "Claude Code 完成",
+                    f"{task_title}{agent_name} 已完成執行",
+                )
+            else:
+                notify(
+                    "Claude Code 失敗",
+                    f"{task_title}{agent_name} 執行失敗",
+                )
 
         # Clean up runner
         if execution_id in self._runners:

@@ -63,12 +63,13 @@ class OutputLog(QWidget):
                 self._append_colored(event.text + "\n", color)
 
     def _append_colored(self, text: str, color: str):
+        if not text:
+            return
+        self._log.moveCursor(self._log.textCursor().MoveOperation.End)
         fmt = QTextCharFormat()
         fmt.setForeground(QColor(color))
         cursor = self._log.textCursor()
-        cursor.movePosition(cursor.MoveOperation.End)
         cursor.insertText(text, fmt)
-        self._log.setTextCursor(cursor)
         # Auto-scroll
         scrollbar = self._log.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
