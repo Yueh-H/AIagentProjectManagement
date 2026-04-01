@@ -1,13 +1,4 @@
-__pycache__/
-*.py[cod]
-*.egg-info/
-dist/
-build/
-.eggs/
-*.db
-.venv/
-venv/
-.env
-*.swp
-*.swo
+node_modules/
 .DS_Store
+data/
+test-results/
