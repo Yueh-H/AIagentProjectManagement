@@ -94,10 +94,16 @@ function createStateStore({
   `);
   const saveProgramBufferStmt = db.prepare(`
     INSERT INTO pane_buffers (client_id, pane_id, buffer, program_buffer, updated_at)
-    VALUES (?, '', ?, ?, CURRENT_TIMESTAMP)
+    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT(client_id, pane_id) DO UPDATE SET
       program_buffer = excluded.program_buffer,
       updated_at = CURRENT_TIMESTAMP
+  `);
+  const listClientsStmt = db.prepare(`
+    SELECT client_id, active_pane_id, panes_json, updated_at
+    FROM client_layouts
+    ORDER BY updated_at DESC
+    LIMIT ?
   `);
 
   function getState(clientId) {
@@ -149,11 +155,24 @@ function createStateStore({
   function appendProgramOutput(clientId, paneId, data) {
     const currentRow = getBufferStmt.get(clientId, paneId);
     const nextBuffer = `${currentRow?.program_buffer || ''}${data}`.slice(-bufferLimit);
-    saveProgramBufferStmt.run(clientId, paneId, nextBuffer);
+    saveProgramBufferStmt.run(clientId, paneId, currentRow?.buffer || '', nextBuffer);
   }
 
   function clearPaneBuffer(clientId, paneId) {
     deleteBufferStmt.run(clientId, paneId);
+  }
+
+  function listClients(limit = 20) {
+    const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(100, Math.trunc(limit))) : 20;
+    return listClientsStmt.all(safeLimit).map((row) => {
+      const panes = row.panes_json ? JSON.parse(row.panes_json) : [];
+      return {
+        clientId: row.client_id,
+        activePaneId: row.active_pane_id || null,
+        paneCount: Array.isArray(panes) ? panes.length : 0,
+        updatedAt: row.updated_at,
+      };
+    });
   }
 
   function close() {
@@ -166,6 +185,7 @@ function createStateStore({
     appendOutput,
     appendProgramOutput,
     clearPaneBuffer,
+    listClients,
     close,
   };
 }

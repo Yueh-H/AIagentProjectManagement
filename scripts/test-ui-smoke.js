@@ -8,9 +8,29 @@ const { spawn } = require('node:child_process');
 const ROOT = path.join(__dirname, '..');
 const TEST_RESULTS_DIR = path.join(ROOT, 'test-results');
 const MARKDOWN_VALUE = '# Handoff\n\n## Agent Output\n- Linked to Agent Shell\n- Streaming recent CLI text\n\n```bash\npnpm test\n```\n';
+const MISSION_TITLE = '登入流程任務';
+const MISSION_STATUS = '已完成 1/3，等待驗證環節確認。';
+const MISSION_GOAL = '把任務卡整理成能一眼看懂目前狀況的格式。';
+const MISSION_CRITERIA = [
+  '卡片包含目標與完成標準',
+  '可以清楚看到負責 terminal',
+  'reload 後仍保留任務內容',
+];
+const MISSION_BLOCKERS = '需要兼顧舊版 mission data 的相容。';
+const MISSION_NEXT = '跑 UI smoke test，確認 mission card 也能通過。';
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function matchesExpectedMarkdown(value) {
+  const text = (value || '').trim();
+  return text.includes('# Handoff')
+    && text.includes('## Agent Output')
+    && text.includes('Linked to Agent Shell')
+    && text.includes('Streaming recent CLI text')
+    && text.includes('```bash')
+    && text.includes('pnpm test');
 }
 
 function onceMatchFromProcess(child, pattern, label, timeoutMs = 15000) {
@@ -239,11 +259,12 @@ async function run() {
     await waitFor(async () => {
       const snapshot = await cdp.evaluate(`(() => ({
         terminalReady: !!document.querySelector('.pane-wrapper[data-card-type="terminal"]'),
-        projectButtonReady: !!document.getElementById('btn-agent-card'),
+        agentOutputButtonReady: !!document.getElementById('btn-agent-output-card'),
+        missionButtonReady: !!document.getElementById('btn-mission-card'),
         markdownButtonReady: !!document.getElementById('btn-markdown-card'),
       }))()`);
 
-      if (snapshot?.terminalReady && snapshot.projectButtonReady && snapshot.markdownButtonReady) {
+      if (snapshot?.terminalReady && snapshot.agentOutputButtonReady && snapshot.missionButtonReady && snapshot.markdownButtonReady) {
         return snapshot;
       }
 
@@ -251,25 +272,41 @@ async function run() {
     }, 'initial terminal card');
 
     await cdp.evaluate(`(() => {
-      const terminalTitle = document.querySelector('.pane-wrapper[data-card-type="terminal"] .pane-title-input');
-      if (terminalTitle) {
-        terminalTitle.value = 'Agent Shell';
-        terminalTitle.dispatchEvent(new Event('input', { bubbles: true }));
-        terminalTitle.dispatchEvent(new Event('blur', { bubbles: true }));
-      }
+      const setPaneTitle = (selector, value) => {
+        const pane = document.querySelector(selector);
+        const titleDisplay = pane?.querySelector('.pane-title-display');
+        const titleInput = pane?.querySelector('.pane-title-input');
+        if (titleDisplay) titleDisplay.textContent = value;
+        if (titleInput) {
+          titleInput.value = value;
+          titleInput.dispatchEvent(new Event('input', { bubbles: true }));
+          titleInput.dispatchEvent(new Event('blur', { bubbles: true }));
+        }
+      };
 
-      document.getElementById('btn-agent-card')?.click();
+      setPaneTitle('.pane-wrapper[data-card-type="terminal"]', 'Agent Shell');
+
+      document.getElementById('btn-agent-output-card')?.click();
+      document.getElementById('btn-mission-card')?.click();
       document.getElementById('btn-markdown-card')?.click();
     })()`);
 
     await waitFor(async () => {
       const snapshot = await cdp.evaluate(`(() => ({
         agentCardReady: !!document.querySelector('.pane-wrapper[data-card-type="agent-output"]'),
+        missionCardReady: !!document.querySelector('.pane-wrapper[data-card-type="mission"]'),
         markdownCardReady: !!document.querySelector('.pane-wrapper[data-card-type="markdown"]'),
         sourceOptionCount: document.querySelector('.agent-card-select')?.options?.length || 0,
+        missionSourceOptionCount: document.querySelector('.pane-wrapper[data-card-type="mission"] .mission-source-select')?.options?.length || 0,
       }))()`);
 
-      if (snapshot?.agentCardReady && snapshot.markdownCardReady && snapshot.sourceOptionCount > 1) {
+      if (
+        snapshot?.agentCardReady
+        && snapshot.missionCardReady
+        && snapshot.markdownCardReady
+        && snapshot.sourceOptionCount > 1
+        && snapshot.missionSourceOptionCount > 1
+      ) {
         return snapshot;
       }
 
@@ -277,15 +314,23 @@ async function run() {
     }, 'new cards and terminal source options');
 
     await cdp.evaluate(`(() => {
+      const setPaneTitle = (pane, value) => {
+        const titleDisplay = pane?.querySelector('.pane-title-display');
+        const titleInput = pane?.querySelector('.pane-title-input');
+        if (titleDisplay) titleDisplay.textContent = value;
+        if (titleInput) {
+          titleInput.value = value;
+          titleInput.dispatchEvent(new Event('input', { bubbles: true }));
+          titleInput.dispatchEvent(new Event('blur', { bubbles: true }));
+        }
+      };
+
       const agentCard = document.querySelector('.pane-wrapper[data-card-type="agent-output"]');
+      const missionCard = document.querySelector('.pane-wrapper[data-card-type="mission"]');
       const markdownCard = document.querySelector('.pane-wrapper[data-card-type="markdown"]');
 
-      const agentTitle = agentCard?.querySelector('.pane-title-input');
-      if (agentTitle) {
-        agentTitle.value = 'Claude Feed';
-        agentTitle.dispatchEvent(new Event('input', { bubbles: true }));
-        agentTitle.dispatchEvent(new Event('blur', { bubbles: true }));
-      }
+      setPaneTitle(agentCard, 'Claude Feed');
+      setPaneTitle(missionCard, ${JSON.stringify(MISSION_TITLE)});
 
       const agentNameInput = agentCard?.querySelector('.agent-card-input');
       if (agentNameInput) {
@@ -299,41 +344,123 @@ async function run() {
         sourceSelect.dispatchEvent(new Event('change', { bubbles: true }));
       }
 
-      const markdownTitle = markdownCard?.querySelector('.pane-title-input');
-      if (markdownTitle) {
-        markdownTitle.value = 'handoff.md';
-        markdownTitle.dispatchEvent(new Event('input', { bubbles: true }));
-        markdownTitle.dispatchEvent(new Event('blur', { bubbles: true }));
+      const missionStatusInput = missionCard?.querySelector('.mission-status-summary-input');
+      if (missionStatusInput) {
+        missionStatusInput.value = ${JSON.stringify(MISSION_STATUS)};
+        missionStatusInput.dispatchEvent(new Event('input', { bubbles: true }));
       }
 
-      const markdownEditor = markdownCard?.querySelector('.markdown-card-editor');
+      const missionGoalInput = missionCard?.querySelector('.mission-text-section .mission-text-input');
+      if (missionGoalInput) {
+        missionGoalInput.value = ${JSON.stringify(MISSION_GOAL)};
+        missionGoalInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+
+      const missionChecklistInputs = missionCard?.querySelectorAll('.mission-checklist-input') || [];
+      missionChecklistInputs.forEach((input, index) => {
+        const nextValue = ${JSON.stringify(MISSION_CRITERIA)}[index];
+        if (!nextValue) return;
+        input.value = nextValue;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+
+      const missionChecklistToggle = missionCard?.querySelector('.mission-checklist-toggle');
+      if (missionChecklistToggle) {
+        missionChecklistToggle.checked = true;
+        missionChecklistToggle.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+
+      const missionDetailInputs = missionCard?.querySelectorAll('.mission-detail-grid .mission-text-input') || [];
+      if (missionDetailInputs[0]) {
+        missionDetailInputs[0].value = ${JSON.stringify(MISSION_BLOCKERS)};
+        missionDetailInputs[0].dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      if (missionDetailInputs[1]) {
+        missionDetailInputs[1].value = ${JSON.stringify(MISSION_NEXT)};
+        missionDetailInputs[1].dispatchEvent(new Event('input', { bubbles: true }));
+      }
+
+      const missionSourceSelect = missionCard?.querySelector('.mission-source-select');
+      if (missionSourceSelect && missionSourceSelect.options.length > 1) {
+        missionSourceSelect.value = missionSourceSelect.options[1].value;
+        missionSourceSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+
+      setPaneTitle(markdownCard, 'handoff.md');
+
+      const markdownEditor = markdownCard?._markdownEditor;
       if (markdownEditor) {
-        markdownEditor.value = ${JSON.stringify(MARKDOWN_VALUE)};
-        markdownEditor.dispatchEvent(new Event('input', { bubbles: true }));
+        markdownEditor.setMarkdown('Shortcut heading', false);
+        markdownEditor.changeMode?.('wysiwyg', true);
+        markdownEditor.focus();
+
+        markdownCard
+          ?.querySelector('.toastui-editor-ww-container .ProseMirror')
+          ?.dispatchEvent(new KeyboardEvent('keydown', {
+            bubbles: true,
+            cancelable: true,
+            ctrlKey: true,
+            altKey: true,
+            code: 'Digit1',
+            key: '1',
+          }));
+
+        const toolbar = markdownCard?.querySelector('.toastui-editor-defaultUI-toolbar');
+        markdownCard.dataset.shortcutMarkdown = markdownEditor.getMarkdown();
+        markdownCard.dataset.toolbarDisplay = toolbar ? getComputedStyle(toolbar).display : 'missing';
+        markdownEditor.setMarkdown(${JSON.stringify(MARKDOWN_VALUE)}, false);
       }
     })()`);
 
-    const beforeReload = await waitFor(async () => {
-      const snapshot = await cdp.evaluate(`(() => ({
+    let lastBeforeReloadSnapshot = null;
+    let beforeReload;
+
+    try {
+      beforeReload = await waitFor(async () => {
+        const snapshot = await cdp.evaluate(`(() => ({
         cardTypes: [...document.querySelectorAll('.pane-wrapper')].map((node) => node.dataset.cardType),
         agentSource: document.querySelector('.agent-card-select')?.value || '',
         agentOutput: document.querySelector('.agent-card-output')?.textContent || '',
-        markdown: document.querySelector('.markdown-card-editor')?.value || '',
+        missionTitle: document.querySelector('.pane-wrapper[data-card-type="mission"] .pane-title-input')?.value || '',
+        missionStatus: document.querySelector('.pane-wrapper[data-card-type="mission"] .mission-status-summary-input')?.value || '',
+        missionGoal: document.querySelector('.pane-wrapper[data-card-type="mission"] .mission-text-section .mission-text-input')?.value || '',
+        missionChecklist: [...document.querySelectorAll('.pane-wrapper[data-card-type="mission"] .mission-checklist-input')].map((input) => input.value),
+        missionChecklistDone: document.querySelector('.pane-wrapper[data-card-type="mission"] .mission-checklist-toggle')?.checked || false,
+        missionBlockers: document.querySelectorAll('.pane-wrapper[data-card-type="mission"] .mission-detail-grid .mission-text-input')[0]?.value || '',
+        missionNext: document.querySelectorAll('.pane-wrapper[data-card-type="mission"] .mission-detail-grid .mission-text-input')[1]?.value || '',
+        missionSource: document.querySelector('.pane-wrapper[data-card-type="mission"] .mission-source-select')?.value || '',
+        missionHasOutputPreview: !!document.querySelector('.pane-wrapper[data-card-type="mission"] .mission-output-preview'),
+        markdown: document.querySelector('.pane-wrapper[data-card-type="markdown"]')?._markdownEditor?.getMarkdown() || '',
+        markdownPreview: document.querySelector('.pane-wrapper[data-card-type="markdown"] .toastui-editor-ww-container .toastui-editor-contents')?.textContent || '',
+        markdownShortcutMarkdown: document.querySelector('.pane-wrapper[data-card-type="markdown"]')?.dataset?.shortcutMarkdown || '',
+        markdownToolbarDisplay: document.querySelector('.pane-wrapper[data-card-type="markdown"]')?.dataset?.toolbarDisplay || '',
       }))()`);
+        lastBeforeReloadSnapshot = snapshot;
 
-      if (
-        Array.isArray(snapshot?.cardTypes)
-        && snapshot.cardTypes.includes('agent-output')
-        && snapshot.cardTypes.includes('markdown')
-        && snapshot.agentSource
-        && snapshot.agentOutput.trim()
-        && snapshot.markdown === MARKDOWN_VALUE
-      ) {
-        return snapshot;
-      }
+        if (
+          Array.isArray(snapshot?.cardTypes)
+          && snapshot.cardTypes.includes('agent-output')
+          && snapshot.cardTypes.includes('mission')
+          && snapshot.cardTypes.includes('markdown')
+          && snapshot.agentSource
+          && snapshot.agentOutput.trim()
+          && snapshot.missionTitle === MISSION_TITLE
+          && snapshot.missionGoal === MISSION_GOAL
+          && snapshot.missionSource
+          && !snapshot.missionHasOutputPreview
+          && matchesExpectedMarkdown(snapshot.markdown)
+          && snapshot.markdownPreview.includes('Agent Output')
+          && snapshot.markdownShortcutMarkdown.startsWith('# Shortcut heading')
+          && snapshot.markdownToolbarDisplay === 'none'
+        ) {
+          return snapshot;
+        }
 
-      return null;
-    }, 'ui smoke state before reload', 15000, 300);
+        return null;
+      }, 'ui smoke state before reload', 15000, 300);
+    } catch (error) {
+      throw new Error(`${error.message}\nLast before-reload snapshot: ${JSON.stringify(lastBeforeReloadSnapshot)}`);
+    }
 
     const loadEvent = cdp.waitForEvent('Page.loadEventFired');
     await cdp.send('Page.reload', { ignoreCache: true });
@@ -348,11 +475,27 @@ async function run() {
         agentSource: document.querySelector('.agent-card-select')?.value || '',
         agentSummary: document.querySelector('.agent-card-summary-title')?.textContent || '',
         agentOutput: document.querySelector('.agent-card-output')?.textContent || '',
+        missionTitle: document.querySelector('.pane-wrapper[data-card-type="mission"] .pane-title-input')?.value || '',
+        missionStatus: document.querySelector('.pane-wrapper[data-card-type="mission"] .mission-status-summary-input')?.value || '',
+        missionGoal: document.querySelector('.pane-wrapper[data-card-type="mission"] .mission-text-section .mission-text-input')?.value || '',
+        missionChecklist: [...document.querySelectorAll('.pane-wrapper[data-card-type="mission"] .mission-checklist-input')].map((input) => input.value),
+        missionChecklistDone: document.querySelector('.pane-wrapper[data-card-type="mission"] .mission-checklist-toggle')?.checked || false,
+        missionBlockers: document.querySelectorAll('.pane-wrapper[data-card-type="mission"] .mission-detail-grid .mission-text-input')[0]?.value || '',
+        missionNext: document.querySelectorAll('.pane-wrapper[data-card-type="mission"] .mission-detail-grid .mission-text-input')[1]?.value || '',
+        missionSource: document.querySelector('.pane-wrapper[data-card-type="mission"] .mission-source-select')?.value || '',
+        missionHasOutputPreview: !!document.querySelector('.pane-wrapper[data-card-type="mission"] .mission-output-preview'),
         markdownTitle: document.querySelector('.pane-wrapper[data-card-type="markdown"] .pane-title-input')?.value || '',
-        markdown: document.querySelector('.markdown-card-editor')?.value || '',
+        markdown: document.querySelector('.pane-wrapper[data-card-type="markdown"]')?._markdownEditor?.getMarkdown() || '',
+        markdownPreview: document.querySelector('.pane-wrapper[data-card-type="markdown"] .toastui-editor-ww-container .toastui-editor-contents')?.textContent || '',
+        markdownToolbarDisplay: getComputedStyle(document.querySelector('.pane-wrapper[data-card-type="markdown"] .toastui-editor-defaultUI-toolbar')).display,
       }))()`);
 
-      if (Array.isArray(snapshot?.cardTypes) && snapshot.cardTypes.includes('agent-output') && snapshot.cardTypes.includes('markdown')) {
+      if (
+        Array.isArray(snapshot?.cardTypes)
+        && snapshot.cardTypes.includes('agent-output')
+        && snapshot.cardTypes.includes('mission')
+        && snapshot.cardTypes.includes('markdown')
+      ) {
         return snapshot;
       }
 
@@ -363,13 +506,24 @@ async function run() {
     fs.writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
 
     assert.ok(beforeReload.agentOutput.trim().length > 0, 'agent output card should capture terminal text');
-    assert.deepEqual(afterReload.cardTypes, ['terminal', 'agent-output', 'markdown']);
+    assert.deepEqual(afterReload.cardTypes, ['terminal', 'agent-output', 'mission', 'markdown']);
     assert.equal(afterReload.terminalTitle, 'Agent Shell');
     assert.equal(afterReload.agentTitle, 'Claude Feed');
     assert.equal(afterReload.agentName, 'claude-code');
     assert.equal(afterReload.agentSource, beforeReload.agentSource);
+    assert.equal(afterReload.missionTitle, MISSION_TITLE);
+    assert.equal(afterReload.missionStatus, MISSION_STATUS);
+    assert.equal(afterReload.missionGoal, MISSION_GOAL);
+    assert.deepEqual(afterReload.missionChecklist.slice(0, MISSION_CRITERIA.length), MISSION_CRITERIA);
+    assert.equal(afterReload.missionChecklistDone, true);
+    assert.equal(afterReload.missionBlockers, MISSION_BLOCKERS);
+    assert.equal(afterReload.missionNext, MISSION_NEXT);
+    assert.equal(afterReload.missionSource, beforeReload.missionSource);
+    assert.equal(afterReload.missionHasOutputPreview, false);
     assert.equal(afterReload.markdownTitle, 'handoff.md');
-    assert.equal(afterReload.markdown, MARKDOWN_VALUE);
+    assert.equal(matchesExpectedMarkdown(afterReload.markdown), true);
+    assert.ok(afterReload.markdownPreview.includes('Agent Output'));
+    assert.equal(afterReload.markdownToolbarDisplay, 'none');
     assert.ok(afterReload.agentSummary.includes('claude-code following Agent Shell'));
     assert.ok(afterReload.agentOutput.trim().length > 0, 'agent output should still be readable after reload');
 

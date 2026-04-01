@@ -2,6 +2,8 @@
 
 A browser-based workspace for running CLI agents and organizing work as draggable cards on an infinite canvas.
 
+See [CHANGELOG.md](./CHANGELOG.md) for the current project snapshot and version history.
+
 This project combines:
 
 - terminal sessions powered by `node-pty` and `xterm.js`
@@ -104,6 +106,70 @@ You can also force a port:
 
 ```bash
 PORT=3005 npm start
+```
+
+## Card Automation API
+
+The server now exposes a small local API so CLI agents such as Claude Code can create and update workspace cards without clicking in the browser.
+
+### Discover workspaces
+
+```bash
+curl http://127.0.0.1:3000/api/workspaces
+```
+
+If you only use one browser workspace, the CLI helper can default to the most recently updated one.
+
+### Create a markdown card
+
+```bash
+curl -X POST http://127.0.0.1:3000/api/cards \
+  -H 'content-type: application/json' \
+  -d '{
+    "type": "markdown",
+    "title": "Claude Notes.md",
+    "data": {
+      "markdown": "# Claude Notes\n\n- created from API\n"
+    }
+  }'
+```
+
+### Update card content
+
+```bash
+curl -X PATCH http://127.0.0.1:3000/api/cards/pane-2 \
+  -H 'content-type: application/json' \
+  -d '{
+    "append": {
+      "markdown": "\n- append one more line\n"
+    }
+  }'
+```
+
+Supported writable card types:
+
+- `markdown`
+- `project`
+- `agent-output`
+
+### CLI helper for Claude Code
+
+Instead of hand-writing `curl`, you can run:
+
+```bash
+npm run cards -- create --type markdown --title "Claude Notes.md" --markdown "# Claude Notes"
+```
+
+Append more content later:
+
+```bash
+npm run cards -- update pane-2 --append-markdown $'\n- one more line'
+```
+
+List cards in the latest workspace:
+
+```bash
+npm run cards -- list-cards
 ```
 
 ## Test Commands

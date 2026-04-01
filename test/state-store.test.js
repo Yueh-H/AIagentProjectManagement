@@ -155,3 +155,40 @@ test('state store preserves agent-output and markdown card data without terminal
 
   store.close();
 });
+
+test('state store keeps program output scoped to the correct terminal pane', () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'web-terminal-db-'));
+  const dbPath = path.join(tempDir, 'state.sqlite');
+  const store = createStateStore({ dbPath, bufferLimit: 64 });
+
+  store.saveLayout('client-c', {
+    activePaneId: 'pane-1',
+    panes: [
+      {
+        id: 'pane-1',
+        title: 'Main',
+        bounds: { x: 10, y: 20, width: 700, height: 500 },
+      },
+    ],
+  });
+
+  store.appendOutput('client-c', 'pane-1', '$ echo hi\n');
+  store.appendProgramOutput('client-c', 'pane-1', 'hi\n');
+
+  assert.deepEqual(store.getState('client-c'), {
+    activePaneId: 'pane-1',
+    panes: [
+      {
+        id: 'pane-1',
+        type: 'terminal',
+        title: 'Main',
+        bounds: { x: 10, y: 20, width: 700, height: 500 },
+        data: {},
+        buffer: '$ echo hi\n',
+        programBuffer: 'hi\n',
+      },
+    ],
+  });
+
+  store.close();
+});

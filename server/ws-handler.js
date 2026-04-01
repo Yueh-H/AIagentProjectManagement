@@ -1,6 +1,7 @@
 const WebSocket = require('ws');
 const ptyManager = require('./pty-manager');
 const stateStore = require('./state-store');
+const workspaceSync = require('./workspace-sync');
 
 function getPtyKey(clientId, paneId) {
   return clientId ? `${clientId}:${paneId}` : paneId;
@@ -10,6 +11,7 @@ function createConnectionHandler({
   ptyManagerImpl = ptyManager,
   webSocketImpl = WebSocket,
   stateStoreImpl = stateStore,
+  workspaceSyncImpl = workspaceSync,
 } = {}) {
   const ECHO_WINDOW_MS = 300;
 
@@ -24,7 +26,13 @@ function createConnectionHandler({
 
       switch (msg.type) {
         case 'init': {
+          if (currentClientId && currentClientId !== msg.clientId) {
+            workspaceSyncImpl.unregisterSocket(ws);
+          }
           currentClientId = msg.clientId || null;
+          if (currentClientId) {
+            workspaceSyncImpl.registerSocket(currentClientId, ws);
+          }
           if (currentClientId && ws.readyState === webSocketImpl.OPEN) {
             ws.send(JSON.stringify({
               type: 'hydrate',
@@ -116,6 +124,7 @@ function createConnectionHandler({
     });
 
     ws.on('close', () => {
+      workspaceSyncImpl.unregisterSocket(ws);
       for (const key of paneKeys) {
         ptyManagerImpl.destroyPty(key);
       }

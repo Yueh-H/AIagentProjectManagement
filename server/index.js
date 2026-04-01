@@ -2,14 +2,17 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const { WebSocketServer } = require('ws');
+const { createApiRouter } = require('./api-router');
 const { handleConnection } = require('./ws-handler');
 
 const app = express();
 const server = http.createServer(app);
 
+app.use('/api', createApiRouter());
 // Serve static files
 app.use('/', express.static(path.join(__dirname, '..', 'public')));
 app.use('/xterm', express.static(path.join(__dirname, '..', 'node_modules', '@xterm')));
+app.use('/vendor/toastui-editor', express.static(path.join(__dirname, '..', 'node_modules', '@toast-ui', 'editor', 'dist')));
 
 // WebSocket
 const wss = new WebSocketServer({ noServer: true });
