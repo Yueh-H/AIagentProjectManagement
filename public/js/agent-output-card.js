@@ -44,7 +44,7 @@ class AgentOutputCard extends BaseCard {
     this.sourceSelectEl = document.createElement('select');
     this.sourceSelectEl.className = 'agent-card-select';
     this.sourceSelectEl.addEventListener('pointerdown', () => {
-      if (this.onFocus) this.onFocus(this.paneId);
+      this._requestCardFocus({ preserveDomFocus: true });
     });
     this.sourceSelectEl.addEventListener('change', () => {
       this.data.sourcePaneId = this.sourceSelectEl.value;
@@ -61,7 +61,7 @@ class AgentOutputCard extends BaseCard {
     this.agentNameInputEl.value = this.data.agentName;
     this.agentNameInputEl.spellcheck = false;
     this.agentNameInputEl.addEventListener('pointerdown', () => {
-      if (this.onFocus) this.onFocus(this.paneId);
+      this._requestCardFocus({ preserveDomFocus: true });
     });
     this.agentNameInputEl.addEventListener('input', () => {
       this.data.agentName = this.agentNameInputEl.value;
@@ -330,6 +330,13 @@ class AgentOutputCard extends BaseCard {
       sourcePaneId: this.data.sourcePaneId,
       agentName: this.data.agentName,
     };
+  }
+
+  hydratePersistedData(data = {}) {
+    this.data = normalizeAgentOutputData(data);
+    this.agentNameInputEl.value = this.data.agentName;
+    this._syncSourceOptions();
+    this._renderSourceState();
   }
 }
 

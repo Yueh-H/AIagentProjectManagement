@@ -1,3 +1,156 @@
+const BASE_CARD_STYLE_VARS = [
+  '--panel-bg',
+  '--panel-header',
+  '--surface-alpha',
+  '--surface-deep',
+  '--surface-input',
+  '--surface-editor',
+  '--text-main',
+  '--text-muted',
+  '--text-sub',
+  '--text-output',
+  '--border-subtle',
+  '--border-muted',
+  '--pane-card-tint',
+  '--pane-accent-soft',
+  '--pane-frame-color',
+  '--pane-frame-active-color',
+  '--pane-active-ring',
+  '--pane-title-color',
+  '--pane-title-placeholder-color',
+  '--pane-title-input-border',
+  '--pane-title-input-border-hover',
+  '--pane-title-focus-ring',
+];
+
+function createPastelTheme({
+  id,
+  label,
+  swatch,
+  panelBg,
+  panelHeader,
+  frameColor,
+  frameActiveColor = frameColor,
+  accentSoft,
+}) {
+  return Object.freeze({
+    id,
+    label,
+    swatch,
+    panelBg,
+    panelHeader,
+    surfaceAlpha: 'rgba(255, 255, 255, 0.28)',
+    surfaceDeep: 'rgba(255, 255, 255, 0.38)',
+    surfaceInput: 'rgba(255, 255, 255, 0.56)',
+    surfaceEditor: 'rgba(255, 255, 255, 0.68)',
+    textMain: '#2f2925',
+    textMuted: 'rgba(79, 69, 62, 0.72)',
+    textSub: 'rgba(63, 54, 49, 0.84)',
+    textOutput: '#312b27',
+    borderSubtle: 'rgba(96, 76, 70, 0.16)',
+    borderMuted: 'rgba(96, 76, 70, 0.24)',
+    cardTint: 'rgba(255, 255, 255, 0.12)',
+    accentSoft,
+    frameColor,
+    frameActiveColor,
+    activeRing: 'rgba(59, 130, 246, 0.22)',
+    titleColor: '#2f2925',
+    titlePlaceholderColor: 'rgba(79, 69, 62, 0.56)',
+    titleInputBorder: 'rgba(96, 76, 70, 0.2)',
+    titleInputBorderHover: 'rgba(96, 76, 70, 0.32)',
+    titleFocusRing: 'rgba(96, 76, 70, 0.12)',
+  });
+}
+
+const CARD_COLOR_THEMES = Object.freeze({
+  default: Object.freeze({
+    id: 'default',
+    label: 'Default',
+    swatch: '#ffffff',
+  }),
+  rose: createPastelTheme({
+    id: 'rose',
+    label: 'Rose',
+    swatch: '#df5b82',
+    panelBg: '#f5cfd5',
+    panelHeader: '#f2c3ca',
+    frameColor: '#d48c98',
+    accentSoft: 'rgba(212, 140, 152, 0.22)',
+  }),
+  orange: createPastelTheme({
+    id: 'orange',
+    label: 'Orange',
+    swatch: '#f4ac45',
+    panelBg: '#f8d0b0',
+    panelHeader: '#f5c49b',
+    frameColor: '#d6a077',
+    accentSoft: 'rgba(214, 160, 119, 0.22)',
+  }),
+  yellow: createPastelTheme({
+    id: 'yellow',
+    label: 'Yellow',
+    swatch: '#ead94c',
+    panelBg: '#f7e18d',
+    panelHeader: '#f4d96d',
+    frameColor: '#d2bc61',
+    accentSoft: 'rgba(210, 188, 97, 0.22)',
+  }),
+  green: createPastelTheme({
+    id: 'green',
+    label: 'Green',
+    swatch: '#5fc276',
+    panelBg: '#d9e5d2',
+    panelHeader: '#cfddc8',
+    frameColor: '#aebbaf',
+    accentSoft: 'rgba(174, 187, 175, 0.22)',
+  }),
+  blue: createPastelTheme({
+    id: 'blue',
+    label: 'Blue',
+    swatch: '#6d82f7',
+    panelBg: '#dbe4f4',
+    panelHeader: '#d1dbef',
+    frameColor: '#a7b5d6',
+    accentSoft: 'rgba(167, 181, 214, 0.22)',
+  }),
+  violet: createPastelTheme({
+    id: 'violet',
+    label: 'Violet',
+    swatch: '#963fe4',
+    panelBg: '#e7d8f3',
+    panelHeader: '#dfceed',
+    frameColor: '#b59fc7',
+    accentSoft: 'rgba(181, 159, 199, 0.22)',
+  }),
+  charcoal: Object.freeze({
+    id: 'charcoal',
+    label: 'Charcoal',
+    swatch: '#424242',
+    panelBg: '#484848',
+    panelHeader: '#404040',
+    surfaceAlpha: 'rgba(255, 255, 255, 0.08)',
+    surfaceDeep: 'rgba(255, 255, 255, 0.12)',
+    surfaceInput: 'rgba(255, 255, 255, 0.16)',
+    surfaceEditor: 'rgba(255, 255, 255, 0.18)',
+    textMain: '#f5f2ef',
+    textMuted: 'rgba(245, 242, 239, 0.66)',
+    textSub: 'rgba(245, 242, 239, 0.82)',
+    textOutput: '#faf7f4',
+    borderSubtle: 'rgba(255, 255, 255, 0.12)',
+    borderMuted: 'rgba(255, 255, 255, 0.18)',
+    cardTint: 'rgba(255, 255, 255, 0.04)',
+    accentSoft: 'rgba(255, 255, 255, 0.08)',
+    frameColor: 'rgba(255, 255, 255, 0.18)',
+    frameActiveColor: '#808080',
+    activeRing: 'rgba(59, 130, 246, 0.22)',
+    titleColor: '#f5f2ef',
+    titlePlaceholderColor: 'rgba(245, 242, 239, 0.54)',
+    titleInputBorder: 'rgba(255, 255, 255, 0.18)',
+    titleInputBorderHover: 'rgba(255, 255, 255, 0.28)',
+    titleFocusRing: 'rgba(255, 255, 255, 0.12)',
+  }),
+});
+
 class BaseCard {
   constructor(cardId, {
     cardType = 'card',
@@ -22,7 +175,9 @@ class BaseCard {
     this._fitFrame = null;
     this._hoverResizeHandle = null;
     this._titleEditing = false;
-    this._isLongPressDragging = false;
+    this._isActive = false;
+    this._contentInteractionPrimed = false;
+    this.colorTheme = 'default';
 
     // -- Gesture manager for this card --
     this._gestures = new GestureManager();
@@ -66,7 +221,7 @@ class BaseCard {
         this._cancelTitleEdit();
       }
     });
-    // Prevent drag from starting when interacting with the input
+    // Keep the input's own bubble-phase handlers isolated from header clicks.
     this.titleInputEl.addEventListener('pointerdown', (event) => event.stopPropagation());
 
     titleGroup.append(this.titleDisplayEl, this.titleInputEl);
@@ -106,12 +261,13 @@ class BaseCard {
     // -- Register gestures --
     this._registerHeaderGestures();
     this._registerBodyEdgeGestures();
-    this._registerLongPressDrag();
+    this._registerBodyDrag();
 
     this._resizeObserver = new ResizeObserver(() => this.scheduleFit());
     this._resizeObserver.observe(this.bodyEl);
 
     this.setBounds(this.bounds, { notify: false, fit: false });
+    this.setColorTheme('default', { notify: false });
   }
 
   // ──────────────────────────────────────────────
@@ -120,21 +276,30 @@ class BaseCard {
 
   _registerHeaderGestures() {
     let dragStartBounds = null;
+    const defaultDragThreshold = window.WorkspaceConfig?.gesture?.dragThreshold ?? 4;
 
     this._gestures.zone(this.headerEl, {
+      dragThreshold: (e) => {
+        e._cardInteractionLocked = this._isCardInteractionLocked();
+        return this._isInteractiveTarget(e.target) ? defaultDragThreshold : 0;
+      },
+
       filter: (e) => {
-        // Don't intercept close button or active title input
+        // Don't intercept close button
         if (e.target.closest('.pane-close-button')) return false;
-        if (e.target === this.titleInputEl && !this.titleInputEl.hidden) return false;
         return true;
       },
 
-      onTap: () => {
-        if (this.onFocus) this.onFocus(this.paneId);
+      onTap: (e) => {
+        if (e.target === this.titleInputEl && !this.titleInputEl.hidden) return;
+        this._clearContentInteraction();
+        this._requestCardFocus();
       },
 
       onDoubleTap: (e) => {
-        if (this.onFocus) this.onFocus(this.paneId);
+        if (e.target === this.titleInputEl && !this.titleInputEl.hidden) return;
+        this._clearContentInteraction();
+        this._requestCardFocus();
         // Double-tap on title area → edit mode
         const titleRect = this.titleDisplayEl.getBoundingClientRect();
         const inTitleZone = e.clientX >= titleRect.left - 8 && e.clientX <= titleRect.right + 8
@@ -145,14 +310,17 @@ class BaseCard {
       },
 
       onDragStart: (e) => {
-        if (this._isLongPressDragging) return;
-        if (this.onFocus) this.onFocus(this.paneId);
+        if (this._shouldPreserveInteractiveSelection(e.target)) return false;
+        this._requestCardFocus();
+        this._clearContentInteraction();
+        this._releaseInteractiveFocus(e.target);
         dragStartBounds = this.getBounds();
         document.body.classList.add('is-dragging-pane');
+        document.body.classList.add('is-dragging-card');
       },
 
       onDrag: (e, delta) => {
-        if (!dragStartBounds || this._isLongPressDragging) return;
+        if (!dragStartBounds) return;
         const zoom = this.getContainerRect().zoom || 1;
         const nextBounds = window.PaneGeometry.translatePaneBounds(
           dragStartBounds, delta.x / zoom, delta.y / zoom, this.getContainerRect()
@@ -162,6 +330,7 @@ class BaseCard {
 
       onDragEnd: () => {
         document.body.classList.remove('is-dragging-pane');
+        document.body.classList.remove('is-dragging-card');
         dragStartBounds = null;
         this.scheduleFit();
         this._emitBoundsCommit();
@@ -188,11 +357,11 @@ class BaseCard {
       },
 
       onTap: () => {
-        if (this.onFocus) this.onFocus(this.paneId);
+        this._requestCardFocus();
       },
 
       onDragStart: (e) => {
-        if (this.onFocus) this.onFocus(this.paneId);
+        this._requestCardFocus();
         resizeStartBounds = this.getBounds();
         document.body.classList.add('is-dragging-pane');
       },
@@ -231,17 +400,70 @@ class BaseCard {
     return false;
   }
 
-  _registerLongPressDrag() {
-    let dragStartBounds = null;
-    const delay = window.WorkspaceConfig?.gesture?.longPressDragDelay ?? 150;
+  _releaseInteractiveFocus(target) {
+    if (!this._isInteractiveTarget(target)) return;
+    const activeEl = document.activeElement;
+    if (activeEl && this.el.contains(activeEl) && typeof activeEl.blur === 'function') {
+      activeEl.blur();
+    }
+  }
 
-    // Drag helpers shared by both instant and long-press paths
+  _hasFocusedInteractiveContent() {
+    const activeEl = document.activeElement;
+    if (!activeEl || !this.el.contains(activeEl)) return false;
+    if (activeEl === this.el) return false;
+    return this._isInteractiveTarget(activeEl) || activeEl === this.titleInputEl;
+  }
+
+  _hasTextSelectionInside() {
+    const selection = typeof window.getSelection === 'function' ? window.getSelection() : null;
+    if (!selection || selection.isCollapsed || selection.rangeCount < 1) return false;
+    const range = selection.getRangeAt(0);
+    const container = range.commonAncestorContainer;
+    const node = container?.nodeType === 1 ? container : container?.parentElement;
+    return Boolean(node && this.el.contains(node));
+  }
+
+  _isCardInteractionLocked() {
+    if (!this._isActive) return false;
+    if (this._contentInteractionPrimed) return true;
+    if (this._hasFocusedInteractiveContent()) return true;
+    if (this._hasTextSelectionInside()) return true;
+    return false;
+  }
+
+  _primeContentInteraction() {
+    this._contentInteractionPrimed = true;
+  }
+
+  _clearContentInteraction() {
+    this._contentInteractionPrimed = false;
+  }
+
+  _shouldPreserveInteractiveSelection(target) {
+    if (!target) return false;
+    if (target === this.titleInputEl && !this.titleInputEl.hidden && this._hasFocusedInteractiveContent()) {
+      return true;
+    }
+    if (this._isInteractiveTarget(target) && this._hasFocusedInteractiveContent()) {
+      return true;
+    }
+    if (!target.closest('.pane-header') && this._isActive && this._contentInteractionPrimed) {
+      return true;
+    }
+    return false;
+  }
+
+  _registerBodyDrag() {
+    let dragStartBounds = null;
+    const defaultDragThreshold = window.WorkspaceConfig?.gesture?.dragThreshold ?? 4;
+
     const startDrag = (e) => {
-      if (this.onFocus) this.onFocus(this.paneId);
-      this._isLongPressDragging = true;
+      this._requestCardFocus();
+      this._releaseInteractiveFocus(e.target);
       dragStartBounds = this.getBounds();
-      this.el.classList.add('is-long-press-dragging');
       document.body.classList.add('is-dragging-pane');
+      document.body.classList.add('is-dragging-card');
     };
 
     const moveDrag = (e, delta) => {
@@ -254,16 +476,18 @@ class BaseCard {
     };
 
     const endDrag = () => {
-      this._isLongPressDragging = false;
-      this.el.classList.remove('is-long-press-dragging');
       document.body.classList.remove('is-dragging-pane');
+      document.body.classList.remove('is-dragging-card');
       dragStartBounds = null;
       this.scheduleFit();
       this._emitBoundsCommit();
     };
 
     this._gestures.zone(this.el, {
-      longPressDragDelay: delay,
+      dragThreshold: (e) => {
+        e._cardInteractionLocked = this._isCardInteractionLocked();
+        return this._isInteractiveTarget(e.target) ? defaultDragThreshold : 0;
+      },
 
       filter: (e) => {
         if (e.button !== 0) return false;
@@ -273,25 +497,20 @@ class BaseCard {
         return true;
       },
 
-      // Instant drag for non-interactive areas (background, labels, etc.)
-      // Return false to reject → GestureManager won't enter drag mode
-      onDragStart: (e) => {
-        if (this._isInteractiveTarget(e.target)) return false;
-        startDrag(e);
-      },
-      onDrag: (e, delta) => {
-        if (!this._isLongPressDragging) return;
-        moveDrag(e, delta);
-      },
-      onDragEnd: (e) => {
-        if (!this._isLongPressDragging) return;
-        endDrag();
+      onTap: (e) => {
+        this._primeContentInteraction();
+        this._requestCardFocus({
+          preserveDomFocus: this._isInteractiveTarget(e.target),
+        });
       },
 
-      // Long-press drag for interactive areas (terminal, inputs, etc.)
-      onLongPressDragStart: (e) => startDrag(e),
-      onLongPressDrag: (e, delta) => moveDrag(e, delta),
-      onLongPressDragEnd: () => endDrag(),
+      onDragStart: (e) => {
+        if (e._cardInteractionLocked) return false;
+        this._clearContentInteraction();
+        startDrag(e);
+      },
+      onDrag: (e, delta) => moveDrag(e, delta),
+      onDragEnd: () => endDrag(),
     });
   }
 
@@ -442,6 +661,64 @@ class BaseCard {
     return {};
   }
 
+  hydratePersistedData() {}
+
+  getUiPersistData() {
+    return this.colorTheme && this.colorTheme !== 'default'
+      ? { colorTheme: this.colorTheme }
+      : {};
+  }
+
+  hydrateUiState(data = {}) {
+    this.setColorTheme(data?.colorTheme, { notify: false });
+  }
+
+  getColorTheme() {
+    return this.colorTheme || 'default';
+  }
+
+  setColorTheme(colorTheme, { notify = true } = {}) {
+    const nextTheme = BaseCard.getColorThemes()[colorTheme] ? colorTheme : 'default';
+    const didChange = this.colorTheme !== nextTheme;
+
+    this.colorTheme = nextTheme;
+    this.el.dataset.colorTheme = nextTheme;
+    this._applyColorTheme(BaseCard.getColorThemes()[nextTheme]);
+
+    if (notify && didChange) {
+      this.requestPersist();
+    }
+  }
+
+  _applyColorTheme(theme) {
+    BASE_CARD_STYLE_VARS.forEach((key) => this.el.style.removeProperty(key));
+
+    if (!theme || theme.id === 'default') return;
+
+    this.el.style.setProperty('--panel-bg', theme.panelBg);
+    this.el.style.setProperty('--panel-header', theme.panelHeader);
+    this.el.style.setProperty('--surface-alpha', theme.surfaceAlpha);
+    this.el.style.setProperty('--surface-deep', theme.surfaceDeep);
+    this.el.style.setProperty('--surface-input', theme.surfaceInput);
+    this.el.style.setProperty('--surface-editor', theme.surfaceEditor);
+    this.el.style.setProperty('--text-main', theme.textMain);
+    this.el.style.setProperty('--text-muted', theme.textMuted);
+    this.el.style.setProperty('--text-sub', theme.textSub);
+    this.el.style.setProperty('--text-output', theme.textOutput);
+    this.el.style.setProperty('--border-subtle', theme.borderSubtle);
+    this.el.style.setProperty('--border-muted', theme.borderMuted);
+    this.el.style.setProperty('--pane-card-tint', theme.cardTint);
+    this.el.style.setProperty('--pane-accent-soft', theme.accentSoft);
+    this.el.style.setProperty('--pane-frame-color', theme.frameColor);
+    this.el.style.setProperty('--pane-frame-active-color', theme.frameActiveColor);
+    this.el.style.setProperty('--pane-active-ring', theme.activeRing);
+    this.el.style.setProperty('--pane-title-color', theme.titleColor);
+    this.el.style.setProperty('--pane-title-placeholder-color', theme.titlePlaceholderColor);
+    this.el.style.setProperty('--pane-title-input-border', theme.titleInputBorder);
+    this.el.style.setProperty('--pane-title-input-border-hover', theme.titleInputBorderHover);
+    this.el.style.setProperty('--pane-title-focus-ring', theme.titleFocusRing);
+  }
+
   setZIndex(zIndex) {
     this.el.style.zIndex = String(zIndex);
   }
@@ -450,7 +727,17 @@ class BaseCard {
     this.el.focus({ preventScroll: true });
   }
 
+  _requestCardFocus(options) {
+    if (this.onFocus) {
+      this.onFocus(this.paneId, options);
+    }
+  }
+
   setActive(isActive) {
+    this._isActive = Boolean(isActive);
+    if (!this._isActive) {
+      this._clearContentInteraction();
+    }
     this.el.classList.toggle('active', isActive);
   }
 
@@ -466,6 +753,14 @@ class BaseCard {
 
   getElement() {
     return this.el;
+  }
+
+  static getColorThemes() {
+    return CARD_COLOR_THEMES;
+  }
+
+  static getColorThemeEntries() {
+    return Object.values(CARD_COLOR_THEMES);
   }
 }
 

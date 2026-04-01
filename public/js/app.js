@@ -4,6 +4,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const manager = new PaneManager(container);
   manager.init();
 
+  const isEditableTarget = (target) => {
+    if (!(target instanceof Element)) return false;
+    const tag = target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if (target.isContentEditable) return true;
+    return Boolean(target.closest('.xterm, .toastui-editor-defaultUI'));
+  };
+
   // --- Theme toggle ---
   const savedTheme = localStorage.getItem('theme') || 'dark';
   document.documentElement.setAttribute('data-theme', savedTheme);
@@ -53,6 +61,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Keyboard shortcuts (Ctrl+Shift+<key>)
   document.addEventListener('keydown', (e) => {
+    if (!e.metaKey && !e.ctrlKey && !e.altKey && e.shiftKey && e.code === 'Digit1') {
+      if (isEditableTarget(e.target)) return;
+      e.preventDefault();
+      manager.centerViewport({ resetZoom: false });
+      return;
+    }
+
     if (e.ctrlKey && e.shiftKey) {
       const type = shortcutMap[e.key];
       if (type) {

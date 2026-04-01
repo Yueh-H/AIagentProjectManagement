@@ -17,7 +17,7 @@
  *     onLongPressDragStart(e),   // held without moving → drag begins
  *     onLongPressDrag(e, delta),
  *     onLongPressDragEnd(e),
- *     dragThreshold: 4,
+ *     dragThreshold: 4,          // number or fn(pointerDownEvent) => number
  *     doubleTapWindow: 300,
  *     longPressDragDelay: 350,
  *     filter(e) { return true; },
@@ -52,6 +52,9 @@ class GestureManager {
 
       const startX = e.clientX;
       const startY = e.clientY;
+      const dragThreshold = Math.max(0, typeof cfg.dragThreshold === 'function'
+        ? (cfg.dragThreshold(e) ?? 0)
+        : cfg.dragThreshold);
       // State: 'pending' → 'drag' | 'longPressDrag' | (released as tap)
       let mode = 'pending';
       let lpTimer = null;
@@ -71,7 +74,7 @@ class GestureManager {
         const dy = me.clientY - startY;
 
         if (mode === 'pending') {
-          if (Math.abs(dx) > cfg.dragThreshold || Math.abs(dy) > cfg.dragThreshold) {
+          if (Math.abs(dx) > dragThreshold || Math.abs(dy) > dragThreshold) {
             // Moved past threshold → try normal drag
             // If onDragStart returns false, skip drag and keep waiting for long-press
             if (cfg.onDragStart) {
@@ -86,6 +89,10 @@ class GestureManager {
             if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
             mode = 'drag';
             document.body.classList.add('is-gesture-active');
+
+            if (cfg.onDrag) {
+              cfg.onDrag(me, { x: dx, y: dy, clientX: me.clientX, clientY: me.clientY });
+            }
           }
           return;
         }
@@ -138,12 +145,12 @@ class GestureManager {
       window.addEventListener('pointercancel', onUp);
     };
 
-    element.addEventListener('pointerdown', onPointerDown);
+    element.addEventListener('pointerdown', onPointerDown, true);
 
     const entry = {
       element,
       destroy() {
-        element.removeEventListener('pointerdown', onPointerDown);
+        element.removeEventListener('pointerdown', onPointerDown, true);
       },
     };
 
@@ -157,4 +164,10 @@ class GestureManager {
   }
 }
 
-window.GestureManager = GestureManager;
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = GestureManager;
+}
+
+if (typeof window !== 'undefined') {
+  window.GestureManager = GestureManager;
+}

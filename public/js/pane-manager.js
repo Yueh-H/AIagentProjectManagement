@@ -63,6 +63,21 @@ class PaneManager {
         return;
       }
 
+      if (msg.type === 'card_created') {
+        this._applyRemoteCardCreate(msg);
+        return;
+      }
+
+      if (msg.type === 'card_updated') {
+        this._applyRemoteCardUpdate(msg);
+        return;
+      }
+
+      if (msg.type === 'card_deleted') {
+        this._applyRemoteCardDelete(msg);
+        return;
+      }
+
       const pane = this.panes.get(msg.paneId);
       if (pane?.handleMessage) {
         pane.handleMessage(msg);
@@ -114,6 +129,78 @@ class PaneManager {
     return this._getContainerRect();
   }
 
+  _getCanvasHomeRect() {
+    const canvasCfg = window.WorkspaceConfig?.canvas || {};
+    const width = Math.max(canvasCfg.baseWidth || 6000, canvasCfg.minWidth || 3000);
+    const height = Math.max(canvasCfg.baseHeight || 4000, canvasCfg.minHeight || 2000);
+    return { width, height };
+  }
+
+  _getHomeCenterPoint() {
+    const homeRect = this._getCanvasHomeRect();
+    return {
+      x: homeRect.width / 2,
+      y: homeRect.height / 2,
+    };
+  }
+
+  _getDensestCardFocusPoint({ zoom = this._zoom } = {}) {
+    const panes = Array.from(this.panes.values());
+    if (!panes.length) return null;
+
+    const viewport = this._getViewportRect();
+    const visibleWidth = Math.max(1, viewport.width / zoom);
+    const visibleHeight = Math.max(1, viewport.height / zoom);
+    const halfWidth = visibleWidth / 2;
+    const halfHeight = visibleHeight / 2;
+    const paneCenters = panes.map((pane) => {
+      const bounds = pane.getBounds();
+      return {
+        id: pane.paneId,
+        x: bounds.x + (bounds.width / 2),
+        y: bounds.y + (bounds.height / 2),
+      };
+    });
+
+    let bestCluster = null;
+
+    paneCenters.forEach((candidate) => {
+      const included = paneCenters.filter((center) => {
+        return Math.abs(center.x - candidate.x) <= halfWidth
+          && Math.abs(center.y - candidate.y) <= halfHeight;
+      });
+
+      const averageDistance = included.length
+        ? included.reduce((sum, center) => {
+          return sum + Math.hypot(center.x - candidate.x, center.y - candidate.y);
+        }, 0) / included.length
+        : Number.POSITIVE_INFINITY;
+
+      if (!bestCluster
+        || included.length > bestCluster.count
+        || (included.length === bestCluster.count && averageDistance < bestCluster.averageDistance)) {
+        bestCluster = {
+          count: included.length,
+          averageDistance,
+          included,
+        };
+      }
+    });
+
+    if (!bestCluster?.included?.length) return null;
+
+    const center = bestCluster.included.reduce((acc, point) => {
+      acc.x += point.x;
+      acc.y += point.y;
+      return acc;
+    }, { x: 0, y: 0 });
+
+    return {
+      x: center.x / bestCluster.included.length,
+      y: center.y / bestCluster.included.length,
+    };
+  }
+
   _applyTransform() {
     this.canvas.style.transform = `translate(${this._panX}px, ${this._panY}px) scale(${this._zoom})`;
     this._zoomIndicator.textContent = `${Math.round(this._zoom * 100)}%`;
@@ -129,58 +216,155 @@ class PaneManager {
     };
   }
 
-  _showContextMenu(clientX, clientY) {
-    this._hideContextMenu();
-
+  _createContextMenu() {
     const menu = document.createElement('div');
     menu.className = 'ctx-menu';
+    menu.addEventListener('contextmenu', (event) => event.preventDefault());
+    return menu;
+  }
 
+  _createContextMenuItem({ icon = '', label, shortcut = '', onSelect }) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'ctx-menu-item';
+
+    const iconEl = document.createElement('span');
+    iconEl.className = 'ctx-menu-icon';
+    iconEl.textContent = icon;
+
+    const labelEl = document.createElement('span');
+    labelEl.className = 'ctx-menu-label';
+    labelEl.textContent = label;
+
+    const shortcutEl = document.createElement('span');
+    shortcutEl.className = 'ctx-menu-shortcut';
+    shortcutEl.textContent = shortcut;
+
+    item.append(iconEl, labelEl, shortcutEl);
+    item.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (onSelect) onSelect();
+    });
+
+    return item;
+  }
+
+  _createContextMenuDivider() {
+    const divider = document.createElement('div');
+    divider.className = 'ctx-menu-divider';
+    return divider;
+  }
+
+  _mountContextMenu(menu, clientX, clientY) {
+    this._hideContextMenu();
+
+    menu.style.left = '0px';
+    menu.style.top = '0px';
+    menu.style.visibility = 'hidden';
+
+    document.body.appendChild(menu);
+
+    const margin = 12;
+    const menuWidth = menu.offsetWidth || 220;
+    const menuHeight = menu.offsetHeight || 160;
+    const maxLeft = Math.max(margin, window.innerWidth - menuWidth - margin);
+    const maxTop = Math.max(margin, window.innerHeight - menuHeight - margin);
+
+    menu.style.left = `${Math.min(Math.max(clientX, margin), maxLeft)}px`;
+    menu.style.top = `${Math.min(Math.max(clientY, margin), maxTop)}px`;
+    menu.style.visibility = 'visible';
+
+    this._ctxMenu = menu;
+  }
+
+  _showCanvasContextMenu(clientX, clientY) {
+    const menu = this._createContextMenu();
     const cards = CardRegistry.getAll();
+
     cards.forEach((desc) => {
-      const item = document.createElement('button');
-      item.type = 'button';
-      item.className = 'ctx-menu-item';
+      menu.appendChild(this._createContextMenuItem({
+        icon: desc.icon || '',
+        label: desc.buttonLabel,
+        shortcut: desc.shortcutKey ? `\u2318\u21E7${desc.shortcutKey}` : '',
+        onSelect: () => {
+          const canvasPos = this._screenToCanvas(clientX, clientY);
+          const spawnCfg = CardRegistry.getSpawnBounds(desc.type) || {};
+          const viewport = this._getViewportRect();
+          this.createCard(desc.type, {
+            bounds: {
+              x: canvasPos.x,
+              y: canvasPos.y,
+              width: Math.max(spawnCfg.minWidth || 380, Math.round(viewport.width * (spawnCfg.widthRatio || 0.38))),
+              height: Math.max(spawnCfg.minHeight || 260, Math.round(viewport.height * (spawnCfg.heightRatio || 0.48))),
+            },
+          });
+          this._hideContextMenu();
+        },
+      }));
+    });
 
-      const icon = document.createElement('span');
-      icon.className = 'ctx-menu-icon';
-      icon.textContent = desc.icon || '';
+    this._mountContextMenu(menu, clientX, clientY);
+  }
 
-      const label = document.createElement('span');
-      label.className = 'ctx-menu-label';
-      label.textContent = desc.buttonLabel;
+  _showPaneContextMenu(paneId, clientX, clientY) {
+    const pane = this.panes.get(paneId);
+    if (!pane) return;
 
-      const shortcut = document.createElement('span');
-      shortcut.className = 'ctx-menu-shortcut';
-      shortcut.textContent = desc.shortcutKey ? `\u2318\u21E7${desc.shortcutKey}` : '';
+    const menu = this._createContextMenu();
+    menu.classList.add('ctx-menu-pane');
 
-      item.append(icon, label, shortcut);
-      item.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const canvasPos = this._screenToCanvas(clientX, clientY);
-        const spawnCfg = CardRegistry.getSpawnBounds(desc.type) || {};
-        const viewport = this._getViewportRect();
-        this.createCard(desc.type, {
-          bounds: {
-            x: canvasPos.x,
-            y: canvasPos.y,
-            width: Math.max(spawnCfg.minWidth || 380, Math.round(viewport.width * (spawnCfg.widthRatio || 0.38))),
-            height: Math.max(spawnCfg.minHeight || 260, Math.round(viewport.height * (spawnCfg.heightRatio || 0.48))),
-          },
-        });
+    menu.appendChild(this._createContextMenuItem({
+      icon: '\u2715',
+      label: 'Close',
+      onSelect: () => {
+        this.closePane(paneId);
+        this._hideContextMenu();
+      },
+    }));
+
+    menu.appendChild(this._createContextMenuDivider());
+
+    const colorSection = document.createElement('div');
+    colorSection.className = 'ctx-menu-section';
+
+    const colorLabel = document.createElement('div');
+    colorLabel.className = 'ctx-menu-section-label';
+    colorLabel.textContent = 'Color';
+
+    const colorRow = document.createElement('div');
+    colorRow.className = 'ctx-menu-color-row';
+
+    window.BaseCard.getColorThemeEntries().forEach((theme) => {
+      const colorButton = document.createElement('button');
+      colorButton.type = 'button';
+      colorButton.className = 'ctx-menu-color-button';
+      colorButton.title = theme.label;
+      colorButton.setAttribute('aria-label', theme.label);
+      colorButton.style.setProperty('--ctx-color', theme.swatch);
+
+      if (theme.id === 'default') {
+        colorButton.classList.add('is-default');
+      }
+
+      if (pane.getColorTheme?.() === theme.id) {
+        colorButton.classList.add('is-active');
+      }
+
+      colorButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        pane.setColorTheme?.(theme.id);
         this._hideContextMenu();
       });
 
-      menu.appendChild(item);
+      colorRow.appendChild(colorButton);
     });
 
-    // Position: place at cursor, but keep within viewport
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    menu.style.left = `${Math.min(clientX, vw - 220)}px`;
-    menu.style.top  = `${Math.min(clientY, vh - cards.length * 42 - 16)}px`;
+    colorSection.append(colorLabel, colorRow);
+    menu.appendChild(colorSection);
 
-    document.body.appendChild(menu);
-    this._ctxMenu = menu;
+    this._mountContextMenu(menu, clientX, clientY);
   }
 
   _hideContextMenu() {
@@ -193,6 +377,9 @@ class PaneManager {
   _initCanvasPan() {
     let panning = false;
     let didMove = false;
+    let contextMenuMode = null;
+    let contextPaneId = null;
+    let wheelPanTimer = null;
     let startX = 0;
     let startY = 0;
     let startPanX = 0;
@@ -200,12 +387,31 @@ class PaneManager {
 
     const DRAG_THRESHOLD = 4;
 
+    const showWheelPanFeedback = () => {
+      this.container.classList.add('is-panning');
+      if (wheelPanTimer) {
+        clearTimeout(wheelPanTimer);
+      }
+      wheelPanTimer = setTimeout(() => {
+        if (!panning) {
+          this.container.classList.remove('is-panning');
+        }
+        wheelPanTimer = null;
+      }, 120);
+    };
+
     const onDown = (e) => {
       if (e.button !== 2) return;
+      if (this._ctxMenu?.contains(e.target)) return;
       e.preventDefault();
       this._hideContextMenu();
       panning = true;
       didMove = false;
+      const paneEl = e.target.closest('.pane-wrapper');
+      contextMenuMode = paneEl ? 'pane' : 'canvas';
+      contextPaneId = paneEl?.dataset.paneId === this.activePaneId
+        ? paneEl.dataset.paneId
+        : null;
       startX = e.clientX;
       startY = e.clientY;
       startPanX = this._panX;
@@ -238,20 +444,33 @@ class PaneManager {
       this.container.classList.remove('is-panning');
 
       if (panning && !didMove) {
-        // Right-click without drag → show context menu
-        this._showContextMenu(e.clientX, e.clientY);
+        if (contextMenuMode === 'pane' && contextPaneId) {
+          this._showPaneContextMenu(contextPaneId, e.clientX, e.clientY);
+        } else if (contextMenuMode === 'canvas') {
+          this._showCanvasContextMenu(e.clientX, e.clientY);
+        }
       }
       panning = false;
       didMove = false;
+      contextMenuMode = null;
+      contextPaneId = null;
     };
 
-    // Suppress native context menu
-    this.container.addEventListener('contextmenu', (e) => e.preventDefault());
+    // Suppress native context menu. Pane menus are opened manually from onUp.
+    this.container.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+    });
+    this.container.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      if (e.target.closest('.pane-wrapper')) return;
+      if (this._ctxMenu?.contains(e.target)) return;
+      this.setActive(null, { preserveDomFocus: true });
+    });
     this.container.addEventListener('pointerdown', onDown);
 
-    // Dismiss menu on left-click outside the menu
+    // Dismiss menu on outside interaction
     window.addEventListener('pointerdown', (e) => {
-      if (e.button === 0 && this._ctxMenu && !this._ctxMenu.contains(e.target)) {
+      if (this._ctxMenu && !this._ctxMenu.contains(e.target)) {
         this._hideContextMenu();
       }
     });
@@ -266,24 +485,35 @@ class PaneManager {
     const zoomStep = zoomCfg.zoomStep || 0.08;
 
     this.container.addEventListener('wheel', (e) => {
-      if (!e.metaKey && !e.ctrlKey) return;
+      if (e.metaKey || e.ctrlKey) {
+        e.preventDefault();
+
+        const rect = this.container.getBoundingClientRect();
+        // Cursor position relative to the container
+        const cursorX = e.clientX - rect.left;
+        const cursorY = e.clientY - rect.top;
+
+        const oldZoom = this._zoom;
+        const delta = e.deltaY > 0 ? -zoomStep : zoomStep;
+        this._zoom = Math.min(maxZoom, Math.max(minZoom, this._zoom + delta * this._zoom));
+
+        // Adjust pan so the point under the cursor stays fixed
+        const ratio = this._zoom / oldZoom;
+        this._panX = cursorX - ratio * (cursorX - this._panX);
+        this._panY = cursorY - ratio * (cursorY - this._panY);
+
+        this._applyTransform();
+        return;
+      }
+
+      if (!Number.isFinite(e.deltaX) && !Number.isFinite(e.deltaY)) return;
+
       e.preventDefault();
-
-      const rect = this.container.getBoundingClientRect();
-      // Cursor position relative to the container
-      const cursorX = e.clientX - rect.left;
-      const cursorY = e.clientY - rect.top;
-
-      const oldZoom = this._zoom;
-      const delta = e.deltaY > 0 ? -zoomStep : zoomStep;
-      this._zoom = Math.min(maxZoom, Math.max(minZoom, this._zoom + delta * this._zoom));
-
-      // Adjust pan so the point under the cursor stays fixed
-      const ratio = this._zoom / oldZoom;
-      this._panX = cursorX - ratio * (cursorX - this._panX);
-      this._panY = cursorY - ratio * (cursorY - this._panY);
-
+      this._hideContextMenu();
+      this._panX -= e.deltaX;
+      this._panY -= e.deltaY;
       this._applyTransform();
+      showWheelPanFeedback();
     }, { passive: false });
   }
 
@@ -328,6 +558,20 @@ class PaneManager {
     };
   }
 
+  centerViewport({ resetZoom = true } = {}) {
+    if (resetZoom) {
+      this._zoom = 1;
+    }
+
+    const viewport = this._getViewportRect();
+    const focusPoint = this._getDensestCardFocusPoint({ zoom: this._zoom }) || this._getHomeCenterPoint();
+
+    this._panX = Math.round((viewport.width / 2) - (focusPoint.x * this._zoom));
+    this._panY = Math.round((viewport.height / 2) - (focusPoint.y * this._zoom));
+    this._hideContextMenu();
+    this._applyTransform();
+  }
+
   _handlePaneMutation(paneId) {
     this._persistLayout();
     if (this.panes.get(paneId)?.cardType === 'terminal') {
@@ -364,7 +608,7 @@ class PaneManager {
       data,
       getContainerRect: () => this._getContainerRect(),
       onBoundsCommit: (paneId) => this._handlePaneMutation(paneId),
-      onFocus: (paneId) => this.setActive(paneId),
+      onFocus: (paneId, options) => this.setActive(paneId, options),
       onRequestClose: (paneId) => this.closePane(paneId),
       onRuntimeChange: (paneId, runtime) => {
         this._runtimeByPaneId.set(paneId, runtime);
@@ -372,6 +616,7 @@ class PaneManager {
       },
       onRequestFocusCard: (paneId) => this.setActive(paneId),
     });
+    pane.hydrateUiState?.(data);
 
     this.panes.set(id, pane);
     this.canvas.appendChild(pane.getElement());
@@ -410,20 +655,31 @@ class PaneManager {
     return pane;
   }
 
-  setActive(id) {
-    if (this.activePaneId) {
+  setActive(id, { preserveDomFocus = false } = {}) {
+    const nextId = id && this.panes.has(id) ? id : null;
+    const isSamePane = this.activePaneId === nextId;
+
+    if (this.activePaneId && !isSamePane) {
       const prev = this.panes.get(this.activePaneId);
       if (prev) prev.setActive(false);
     }
-    this.activePaneId = id;
-    const curr = this.panes.get(id);
+    this.activePaneId = nextId;
+    const curr = nextId ? this.panes.get(nextId) : null;
     if (curr) {
-      curr.setActive(true);
+      if (!isSamePane) {
+        curr.setActive(true);
+      }
       curr.setZIndex(this._nextZIndex());
-      curr.focus();
+      if (!preserveDomFocus) {
+        curr.focus();
+      }
       this._persistLayout();
       this._refreshWorkspaceCards();
+      return;
     }
+
+    this._persistLayout();
+    this._refreshWorkspaceCards();
   }
 
   splitActive(direction, type = 'terminal') {
@@ -452,6 +708,7 @@ class PaneManager {
   closePane(id) {
     const pane = this.panes.get(id);
     if (!pane) return;
+    this._hideContextMenu();
 
     const wasActive = this.activePaneId === id;
     pane.dispose();
@@ -480,7 +737,10 @@ class PaneManager {
         type: pane.cardType,
         bounds: pane.getBounds(),
         title: pane.getTitle(),
-        data: pane.getPersistData?.() || {},
+        data: {
+          ...(pane.getPersistData?.() || {}),
+          ...(pane.getUiPersistData?.() || {}),
+        },
       })),
     };
 
@@ -558,6 +818,66 @@ class PaneManager {
       if (pane.receiveWorkspaceState) {
         pane.receiveWorkspaceState(workspaceState);
       }
+    }
+  }
+
+  _applyRemoteCardCreate(message) {
+    const paneEntry = message?.pane;
+    if (!paneEntry?.id || this.panes.has(paneEntry.id)) return;
+
+    this._createPane({
+      id: paneEntry.id,
+      type: paneEntry.type,
+      bounds: paneEntry.bounds,
+      title: paneEntry.title,
+      data: paneEntry.data || {},
+      persist: false,
+      shouldInit: true,
+    });
+
+    if (message.activePaneId && this.panes.has(message.activePaneId)) {
+      this.setActive(message.activePaneId, { preserveDomFocus: true });
+    } else {
+      this._refreshWorkspaceCards();
+    }
+  }
+
+  _applyRemoteCardUpdate(message) {
+    const paneEntry = message?.pane;
+    const pane = paneEntry?.id ? this.panes.get(paneEntry.id) : null;
+    if (!pane) return;
+
+    pane.setTitle(paneEntry.title, { notify: false });
+    pane.setBounds(paneEntry.bounds, { notify: false, fit: true });
+    pane.hydratePersistedData?.(paneEntry.data || {});
+    pane.hydrateUiState?.(paneEntry.data || {});
+
+    if (message.activePaneId && this.panes.has(message.activePaneId)) {
+      this.setActive(message.activePaneId, { preserveDomFocus: true });
+    } else {
+      this._refreshWorkspaceCards();
+    }
+  }
+
+  _applyRemoteCardDelete(message) {
+    const paneId = message?.paneId;
+    if (!paneId || !this.panes.has(paneId)) return;
+
+    const pane = this.panes.get(paneId);
+    if (pane?.cardType === 'terminal') return;
+
+    const wasActive = this.activePaneId === paneId;
+    pane.dispose();
+    this.panes.delete(paneId);
+
+    if (wasActive) {
+      this.activePaneId = null;
+    }
+
+    if (message.activePaneId && this.panes.has(message.activePaneId)) {
+      this.setActive(message.activePaneId, { preserveDomFocus: true });
+    } else {
+      this._refreshWorkspaceCards();
     }
   }
 

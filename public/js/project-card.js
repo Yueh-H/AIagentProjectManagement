@@ -200,7 +200,7 @@ class ProjectCard extends BaseCard {
     }
 
     input.addEventListener('pointerdown', () => {
-      if (this.onFocus) this.onFocus(this.paneId);
+      this._requestCardFocus({ preserveDomFocus: true });
     });
     input.addEventListener('input', () => {
       this.data[key] = input.value;
@@ -320,6 +320,11 @@ class ProjectCard extends BaseCard {
     return {
       ...this.data,
     };
+  }
+
+  hydratePersistedData(data = {}) {
+    this.data = normalizeProjectData(data);
+    this._applyPersistedData();
   }
 }
 

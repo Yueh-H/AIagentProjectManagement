@@ -71,7 +71,7 @@ class TerminalPane extends BaseCard {
     });
 
     this.terminal.textarea?.addEventListener('focus', () => {
-      if (this.onFocus) this.onFocus(this.paneId);
+      this._requestCardFocus({ preserveDomFocus: true });
     });
 
     this._emitRuntimeChange();
