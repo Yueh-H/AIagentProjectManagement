@@ -1,0 +1,28 @@
+/* ── Reset & Base ── */
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--app-bg);
+  color: var(--text-main);
+  font-family: "SF Pro Display", "Segoe UI", sans-serif;
+}
+
+:root body {
+  background:
+    radial-gradient(circle at top right, rgba(240, 139, 97, 0.08), transparent 34%),
+    radial-gradient(circle at left bottom, rgba(59, 130, 246, 0.08), transparent 28%),
+    var(--app-bg);
+}
+
+[data-theme="light"] body {
+  background: var(--app-bg);
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}

@@ -1,0 +1,358 @@
+/* ── Light Theme Overrides ── */
+
+/* Workspace section */
+[data-theme="light"] .workspace-section-body {
+  background: rgba(59, 130, 246, 0.04);
+  border-color: rgba(55, 53, 47, 0.16);
+}
+
+[data-theme="light"] .workspace-section.is-selected .workspace-section-body {
+  background: rgba(59, 130, 246, 0.10);
+}
+
+/* ── Card base ── */
+
+[data-theme="light"] .pane-wrapper {
+  --pane-title-color: #9b5a3c;
+  --pane-title-placeholder-color: rgba(155, 90, 60, 0.68);
+  --pane-title-input-border: rgba(155, 90, 60, 0.3);
+  --pane-title-input-border-hover: rgba(155, 90, 60, 0.42);
+  --pane-title-focus-ring: rgba(155, 90, 60, 0.12);
+}
+
+[data-theme="light"] .pane-title-input {
+  background: var(--surface-input);
+}
+
+[data-theme="light"] .pane-wrapper.active {
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(200, 136, 110, 0.4);
+}
+
+[data-theme="light"] .pane-close-button:hover {
+  background: rgba(185, 28, 28, 0.08);
+  border-color: rgba(220, 38, 38, 0.3);
+}
+
+/* ── Project card ── */
+
+[data-theme="light"] .pane-wrapper[data-card-type="project"] {
+  --pane-title-color: #2b7a78;
+  --pane-title-placeholder-color: rgba(43, 122, 120, 0.68);
+  --pane-title-input-border: rgba(43, 122, 120, 0.28);
+  --pane-title-input-border-hover: rgba(43, 122, 120, 0.4);
+  --pane-title-focus-ring: rgba(43, 122, 120, 0.12);
+}
+
+[data-theme="light"] .project-card-health,
+[data-theme="light"] .project-card-plan,
+[data-theme="light"] .project-card-terminals {
+  border-color: var(--border-subtle);
+  background: var(--surface-alpha);
+}
+
+[data-theme="light"] .project-card-health {
+  background: var(--surface-deep);
+}
+
+[data-theme="light"] .project-card-field-input {
+  border-color: var(--border-subtle);
+  background: var(--surface-input);
+  color: var(--text-main);
+}
+
+[data-theme="light"] .project-card-metric {
+  border-color: var(--border-subtle);
+  background: var(--surface-alpha);
+}
+
+[data-theme="light"] .project-card-item {
+  border-color: var(--border-subtle);
+  background: #ffffff;
+}
+
+[data-theme="light"] .project-card-empty {
+  border-color: var(--border-subtle);
+  background: var(--surface-alpha);
+}
+
+[data-theme="light"] .project-card-health-headline {
+  color: var(--text-main);
+}
+
+[data-theme="light"] .project-card-health-detail,
+[data-theme="light"] .project-card-item-preview {
+  color: var(--text-sub);
+}
+
+[data-theme="light"] .project-card-section-title {
+  color: #37352f;
+}
+
+[data-theme="light"] .project-card-health-badge {
+  background: #f0eeeb;
+  border-color: var(--border-subtle);
+  color: var(--text-main);
+}
+
+[data-theme="light"] .project-card-health-badge[data-tone="running"] {
+  color: #2b6e3f;
+  border-color: rgba(43, 110, 63, 0.25);
+  background: rgba(43, 110, 63, 0.08);
+}
+
+[data-theme="light"] .project-card-health-badge[data-tone="idle"] {
+  color: #8b6914;
+  border-color: rgba(139, 105, 20, 0.25);
+  background: rgba(139, 105, 20, 0.08);
+}
+
+[data-theme="light"] .project-card-health-badge[data-tone="danger"] {
+  color: #b33b3b;
+  border-color: rgba(179, 59, 59, 0.25);
+  background: rgba(179, 59, 59, 0.08);
+}
+
+[data-theme="light"] .project-card-health-badge[data-tone="muted"] {
+  color: var(--text-muted);
+  border-color: var(--border-subtle);
+  background: #f0eeeb;
+}
+
+[data-theme="light"] .project-card-focus-button {
+  border-color: rgba(43, 122, 120, 0.3);
+  background: rgba(43, 122, 120, 0.08);
+  color: #2b7a78;
+}
+
+[data-theme="light"] .project-card-item-dot {
+  background: #9b9a97;
+  box-shadow: 0 0 0 4px rgba(155, 154, 151, 0.12);
+}
+
+[data-theme="light"] .project-card-item[data-status="running"] .project-card-item-dot {
+  background: #4a8c5c;
+  box-shadow: 0 0 0 4px rgba(74, 140, 92, 0.12);
+}
+
+[data-theme="light"] .project-card-item[data-status="idle"] .project-card-item-dot,
+[data-theme="light"] .project-card-item[data-status="starting"] .project-card-item-dot {
+  background: #c49a2a;
+  box-shadow: 0 0 0 4px rgba(196, 154, 42, 0.12);
+}
+
+[data-theme="light"] .project-card-item[data-status="exited"] .project-card-item-dot {
+  background: #b33b3b;
+  box-shadow: 0 0 0 4px rgba(179, 59, 59, 0.12);
+}
+
+/* ── Agent output card ── */
+
+[data-theme="light"] .pane-wrapper[data-card-type="agent-output"] {
+  --pane-title-color: #4a8c5c;
+  --pane-title-placeholder-color: rgba(74, 140, 92, 0.68);
+  --pane-title-input-border: rgba(74, 140, 92, 0.28);
+  --pane-title-input-border-hover: rgba(74, 140, 92, 0.4);
+  --pane-title-focus-ring: rgba(74, 140, 92, 0.12);
+}
+
+[data-theme="light"] .agent-card-settings,
+[data-theme="light"] .agent-card-summary,
+[data-theme="light"] .agent-card-output-section,
+[data-theme="light"] .markdown-card-info {
+  border-color: var(--border-subtle);
+  background: var(--surface-alpha);
+}
+
+[data-theme="light"] .agent-card-summary {
+  background: var(--surface-deep);
+}
+
+[data-theme="light"] .agent-card-select,
+[data-theme="light"] .agent-card-input {
+  border-color: var(--border-subtle);
+  background: var(--surface-input);
+  color: var(--text-main);
+}
+
+[data-theme="light"] .agent-card-summary-title {
+  color: var(--text-main);
+}
+
+[data-theme="light"] .agent-card-summary-preview {
+  color: var(--text-sub);
+}
+
+[data-theme="light"] .agent-card-output-title {
+  color: #4a8c5c;
+}
+
+[data-theme="light"] .agent-card-output {
+  border-color: var(--border-subtle);
+  background: var(--surface-editor);
+  color: var(--text-output);
+}
+
+[data-theme="light"] .agent-card-status-badge {
+  background: #f0eeeb;
+  border-color: var(--border-subtle);
+}
+
+[data-theme="light"] .agent-card-status-badge[data-tone="running"] {
+  color: #2b6e3f;
+  border-color: rgba(43, 110, 63, 0.25);
+  background: rgba(43, 110, 63, 0.08);
+}
+
+[data-theme="light"] .agent-card-status-badge[data-tone="idle"] {
+  color: #8b6914;
+  border-color: rgba(139, 105, 20, 0.25);
+  background: rgba(139, 105, 20, 0.08);
+}
+
+[data-theme="light"] .agent-card-status-badge[data-tone="danger"] {
+  color: #b33b3b;
+  border-color: rgba(179, 59, 59, 0.25);
+  background: rgba(179, 59, 59, 0.08);
+}
+
+[data-theme="light"] .agent-card-status-badge[data-tone="muted"] {
+  color: var(--text-muted);
+  border-color: var(--border-subtle);
+  background: #f0eeeb;
+}
+
+[data-theme="light"] .agent-card-focus-button {
+  border-color: rgba(74, 140, 92, 0.3);
+  background: rgba(74, 140, 92, 0.08);
+  color: #4a8c5c;
+}
+
+[data-theme="light"] .agent-block-user {
+  background: rgba(55, 53, 47, 0.04);
+}
+
+[data-theme="light"] .agent-block-agent {
+  background: rgba(74, 140, 92, 0.06);
+}
+
+[data-theme="light"] .agent-block-user .agent-block-label { color: #6b6966; }
+[data-theme="light"] .agent-block-agent .agent-block-label { color: #4a8c5c; }
+[data-theme="light"] .agent-block-text { color: var(--text-output); }
+
+/* ── Markdown card ── */
+
+[data-theme="light"] .pane-wrapper[data-card-type="markdown"] {
+  --pane-title-color: #8b6914;
+  --pane-title-placeholder-color: rgba(139, 105, 20, 0.68);
+  --pane-title-input-border: rgba(139, 105, 20, 0.26);
+  --pane-title-input-border-hover: rgba(139, 105, 20, 0.38);
+  --pane-title-focus-ring: rgba(139, 105, 20, 0.12);
+}
+
+[data-theme="light"] .markdown-card-info {
+  background: var(--surface-deep);
+}
+
+[data-theme="light"] .markdown-card-info-title { color: #8b6914; }
+[data-theme="light"] .markdown-card-info-caption { color: var(--text-sub); }
+
+[data-theme="light"] .markdown-card-editor {
+  border-color: var(--border-subtle);
+  background: var(--surface-editor);
+  color: var(--text-main);
+}
+
+[data-theme="light"] .pane-wrapper[data-card-type="markdown"][data-color-theme]:not([data-color-theme="default"]) .markdown-card-editor,
+[data-theme="light"] .pane-wrapper[data-card-type="markdown"][data-color-theme]:not([data-color-theme="default"]) .markdown-card-editor:hover,
+[data-theme="light"] .pane-wrapper[data-card-type="markdown"][data-color-theme]:not([data-color-theme="default"]) .markdown-card-editor:focus {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+/* ── Mission card ── */
+
+[data-theme="light"] .pane-wrapper[data-card-type="mission"] {
+  --pane-title-color: #7c3aed;
+  --pane-title-placeholder-color: rgba(124, 58, 237, 0.7);
+  --pane-title-input-border: rgba(124, 58, 237, 0.24);
+  --pane-title-input-border-hover: rgba(124, 58, 237, 0.38);
+  --pane-title-focus-ring: rgba(124, 58, 237, 0.14);
+}
+
+[data-theme="light"] .mission-status-panel {
+  border-color: var(--border-subtle);
+  background: #f0eeeb;
+}
+
+[data-theme="light"] .mission-status-panel[data-tone="running"] {
+  background: linear-gradient(135deg, rgba(43, 110, 63, 0.1), rgba(43, 110, 63, 0.04));
+  border-color: rgba(43, 110, 63, 0.25);
+}
+
+[data-theme="light"] .mission-status-panel[data-tone="done"] {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(37, 99, 235, 0.04));
+  border-color: rgba(37, 99, 235, 0.25);
+}
+
+[data-theme="light"] .mission-status-panel[data-tone="danger"] {
+  background: linear-gradient(135deg, rgba(179, 59, 59, 0.1), rgba(179, 59, 59, 0.04));
+  border-color: rgba(179, 59, 59, 0.25);
+}
+
+[data-theme="light"] .mission-status-panel[data-tone="muted"] {
+  background: #f0eeeb;
+}
+
+[data-theme="light"] .mission-status-button[data-tone="running"] {
+  color: #2b6e3f;
+  border-color: rgba(43, 110, 63, 0.24);
+  background: rgba(43, 110, 63, 0.08);
+}
+
+[data-theme="light"] .mission-status-button[data-tone="done"] {
+  color: #2563eb;
+  border-color: rgba(37, 99, 235, 0.22);
+  background: rgba(37, 99, 235, 0.08);
+}
+
+[data-theme="light"] .mission-status-button[data-tone="danger"] {
+  color: #b33b3b;
+  border-color: rgba(179, 59, 59, 0.22);
+  background: rgba(179, 59, 59, 0.08);
+}
+
+[data-theme="light"] .mission-status-button[data-tone="muted"] {
+  color: var(--text-muted);
+}
+
+[data-theme="light"] .mission-status-summary-input,
+[data-theme="light"] .mission-text-input {
+  border-color: var(--border-subtle);
+  background: var(--surface-input);
+  color: var(--text-main);
+}
+
+[data-theme="light"] .mission-checklist-item,
+[data-theme="light"] .mission-owner-section,
+[data-theme="light"] .mission-checklist-section,
+[data-theme="light"] .mission-text-section {
+  border-color: var(--border-subtle);
+  background: var(--surface-alpha);
+}
+
+[data-theme="light"] .mission-source-select {
+  border-color: var(--border-subtle);
+  background: var(--surface-input);
+  color: var(--text-main);
+}
+
+[data-theme="light"] .mission-owner-description { color: var(--text-sub); }
+
+[data-theme="light"] .mission-focus-button {
+  border-color: rgba(99, 102, 241, 0.24);
+  background: rgba(99, 102, 241, 0.08);
+  color: #4f46e5;
+}

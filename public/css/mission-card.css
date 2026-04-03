@@ -1,0 +1,511 @@
+/* ── Mission Card ── */
+
+.mission-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+  overflow: auto;
+}
+
+.mission-status-panel,
+.mission-text-section,
+.mission-checklist-section,
+.mission-owner-section {
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  background: var(--surface-alpha);
+}
+
+/* ── Status panel ── */
+
+.mission-status-panel {
+  padding: 16px;
+  background: var(--surface-deep);
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+
+.mission-status-panel[data-tone="running"] {
+  background: linear-gradient(135deg, rgba(21, 128, 61, 0.28), rgba(21, 128, 61, 0.12));
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.mission-status-panel[data-tone="done"] {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.28), rgba(37, 99, 235, 0.12));
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
+.mission-status-panel[data-tone="danger"] {
+  background: linear-gradient(135deg, rgba(153, 27, 27, 0.32), rgba(153, 27, 27, 0.14));
+  border-color: rgba(248, 113, 113, 0.3);
+}
+
+.mission-status-panel[data-tone="muted"] {
+  background: var(--surface-deep);
+  border-color: var(--border-subtle);
+}
+
+.mission-status-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mission-status-panel-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mission-status-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.mission-status-button,
+.mission-status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-input);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.mission-status-chip { color: var(--text-sub); }
+
+.mission-status-button {
+  appearance: none;
+  cursor: pointer;
+  color: var(--text-main);
+  transition: transform 0.16s ease, border-color 0.16s ease, filter 0.16s ease;
+}
+
+.mission-status-button:hover { transform: translateY(-1px); }
+
+.mission-status-button[data-tone="running"] {
+  color: #bbf7d0;
+  border-color: rgba(34, 197, 94, 0.32);
+  background: rgba(21, 128, 61, 0.22);
+}
+
+.mission-status-button[data-tone="done"] {
+  color: #bfdbfe;
+  border-color: rgba(96, 165, 250, 0.32);
+  background: rgba(37, 99, 235, 0.2);
+}
+
+.mission-status-button[data-tone="danger"] {
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.32);
+  background: rgba(153, 27, 27, 0.22);
+}
+
+.mission-status-button[data-tone="muted"] { color: #cbd5e1; }
+
+/* ── Text inputs ── */
+
+.mission-status-summary-input,
+.mission-text-input {
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--surface-input);
+  color: var(--text-main);
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.mission-status-summary-input {
+  margin-top: 12px;
+  min-height: 72px;
+}
+
+.mission-status-summary-input:hover,
+.mission-status-summary-input:focus,
+.mission-text-input:hover,
+.mission-text-input:focus {
+  border-color: rgba(99, 102, 241, 0.36);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.18);
+  background: var(--surface-editor);
+}
+
+.mission-status-summary-input::placeholder,
+.mission-text-input::placeholder {
+  color: rgba(148, 163, 184, 0.72);
+}
+
+.mission-status-time {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── Text section ── */
+
+.mission-text-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+}
+
+.mission-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.mission-section-caption {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.mission-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* ── Checklist ── */
+
+.mission-checklist-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+
+.mission-checklist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mission-checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--surface-input);
+  padding: 10px 12px;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.mission-checklist-item:focus-within {
+  border-color: rgba(99, 102, 241, 0.36);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.16);
+  background: var(--surface-editor);
+}
+
+.mission-checklist-item[data-done="true"] { opacity: 0.78; }
+
+.mission-checklist-item[data-done="true"] .mission-checklist-input {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.mission-checklist-toggle {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  accent-color: #22c55e;
+}
+
+.mission-checklist-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 13px;
+  line-height: 1.5;
+  outline: none;
+}
+
+.mission-checklist-input::placeholder {
+  color: rgba(148, 163, 184, 0.72);
+}
+
+.mission-checklist-remove {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 4px 0 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.mission-checklist-remove:hover { color: #fca5a5; }
+
+.mission-add-checklist-button {
+  appearance: none;
+  border: 1px dashed var(--border-muted);
+  border-radius: 999px;
+  background: var(--surface-alpha);
+  color: var(--text-sub);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.16s ease, transform 0.16s ease, background 0.16s ease;
+}
+
+.mission-add-checklist-button:hover {
+  border-color: rgba(99, 102, 241, 0.42);
+  background: var(--surface-input);
+  transform: translateY(-1px);
+}
+
+/* ── Detail grid ── */
+
+.mission-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+/* ── Owner section ── */
+
+.mission-owner-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+}
+
+.mission-source-select {
+  flex-shrink: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-input);
+  color: var(--text-main);
+  padding: 10px 12px;
+  font-size: 12px;
+  outline: none;
+}
+
+.mission-source-select:focus,
+.mission-source-select:hover {
+  border-color: rgba(99, 102, 241, 0.36);
+}
+
+.mission-owner-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mission-owner-description {
+  color: var(--text-sub);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.mission-focus-button {
+  align-self: flex-start;
+  appearance: none;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  background: rgba(99, 102, 241, 0.15);
+  color: #c7d2fe;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.mission-focus-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ── Source indicator ── */
+
+.mission-source-input {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-alpha);
+  cursor: pointer;
+  align-self: flex-start;
+  transition: background 0.12s;
+}
+
+.mission-source-input:hover {
+  background: var(--surface-deep);
+  color: var(--text-main);
+}
+
+/* ── Execute section ── */
+
+.mission-exec-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--surface-alpha);
+  padding: 12px;
+}
+
+.mission-execute-button {
+  appearance: none;
+  align-self: flex-start;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  background: rgba(22, 163, 74, 0.15);
+  color: #86efac;
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mission-execute-button:hover:not(:disabled) {
+  background: rgba(22, 163, 74, 0.28);
+}
+
+.mission-execute-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── AI Response section ── */
+
+.mission-response-section {
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--surface-alpha);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mission-response-output {
+  max-height: 300px;
+  overflow: auto;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-deep);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-main);
+}
+
+.mission-response-output:empty::before {
+  content: '尚無 AI 回應。從 Prompt 卡片發送指令開始。';
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* ── Rendered markdown in response ── */
+
+.mission-md-rendered {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-main);
+  word-break: break-word;
+}
+
+.mission-md-rendered h1,
+.mission-md-rendered h2,
+.mission-md-rendered h3 {
+  margin: 12px 0 6px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.mission-md-rendered h1 { font-size: 18px; }
+.mission-md-rendered h2 { font-size: 16px; }
+.mission-md-rendered h3 { font-size: 14px; }
+
+.mission-md-rendered p { margin: 4px 0; }
+
+.mission-md-rendered ul,
+.mission-md-rendered ol {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+
+.mission-md-rendered li { margin: 2px 0; }
+
+.mission-md-rendered code {
+  background: var(--surface-deep, rgba(255, 255, 255, 0.1));
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: "SF Mono", Menlo, Monaco, monospace;
+  font-size: 12px;
+}
+
+.mission-md-rendered pre {
+  background: var(--surface-deep, rgba(0, 0, 0, 0.2));
+  border-radius: 8px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.mission-md-rendered pre code {
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mission-md-rendered strong {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.mission-md-rendered hr {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  margin: 10px 0;
+}
+
+.mission-md-rendered blockquote {
+  border-left: 3px solid var(--border-muted, var(--border-subtle));
+  padding-left: 12px;
+  margin: 6px 0;
+  color: var(--text-muted);
+}
+
+/* Toast UI Viewer inside mission */
+.mission-md-rendered .toastui-editor-contents {
+  font-size: 13px;
+  padding: 0;
+}
+
+.mission-md-rendered .toastui-editor-contents p {
+  margin: 4px 0;
+}

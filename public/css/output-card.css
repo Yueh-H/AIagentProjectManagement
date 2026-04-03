@@ -1,0 +1,126 @@
+/* ── Output Card ── */
+
+.output-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  overflow: auto;
+}
+
+.output-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-main);
+  margin-bottom: 8px;
+}
+
+.output-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.output-overview {
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--surface-alpha);
+  padding: 12px;
+}
+
+.output-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.output-task-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-deep);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.output-task-item:hover {
+  border-color: var(--pane-frame-active-color, var(--accent));
+}
+
+.output-task-icon { font-size: 14px; }
+.output-task-name { flex: 1; color: var(--text-main); }
+
+.output-task-status {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.output-progress-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-deep);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.output-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #22c55e, #3b82f6);
+  transition: width 0.3s ease;
+}
+
+.output-progress-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.output-summary-section {
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--surface-alpha);
+  padding: 12px;
+}
+
+.output-summary-content {
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface-deep);
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-main);
+  min-height: 100px;
+  overflow: auto;
+  max-height: 400px;
+}
+
+.output-regenerate-button {
+  appearance: none;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-alpha);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.output-regenerate-button:hover:not(:disabled) {
+  background: var(--surface-deep);
+  color: var(--text-main);
+}
+
+.output-regenerate-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

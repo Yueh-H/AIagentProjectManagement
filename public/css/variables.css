@@ -1,0 +1,47 @@
+/* ── CSS Variables (Dark / Light) ── */
+
+:root {
+  --app-bg: #15171c;
+  --panel-bg: #10161f;
+  --panel-border: #31506f;
+  --panel-border-active: #f08b61;
+  --panel-header: rgba(17, 24, 39, 0.92);
+  --panel-shadow: 0 20px 60px rgba(0, 0, 0, 0.38);
+  --text-main: #e5e7eb;
+  --text-muted: #94a3b8;
+  --accent: #f08b61;
+  --accent-soft: rgba(240, 139, 97, 0.2);
+  --surface-alpha: rgba(15, 23, 42, 0.56);
+  --surface-deep: rgba(15, 23, 42, 0.72);
+  --surface-input: rgba(15, 23, 42, 0.76);
+  --surface-editor: rgba(15, 23, 42, 0.92);
+  --border-subtle: rgba(148, 163, 184, 0.18);
+  --border-muted: rgba(148, 163, 184, 0.22);
+  --text-sub: #cbd5e1;
+  --text-output: #e2e8f0;
+  --xterm-bg: #111827;
+  --xterm-fg: #e5e7eb;
+}
+
+[data-theme="light"] {
+  --app-bg: #f7f5f2;
+  --panel-bg: #ffffff;
+  --panel-border: #e8e5e0;
+  --panel-border-active: #c8886e;
+  --panel-header: rgba(255, 255, 255, 0.95);
+  --panel-shadow: 0 4px 16px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --text-main: #37352f;
+  --text-muted: #9b9a97;
+  --accent: #c8886e;
+  --accent-soft: rgba(200, 136, 110, 0.12);
+  --surface-alpha: rgba(247, 245, 242, 0.8);
+  --surface-deep: #f0eeeb;
+  --surface-input: #ffffff;
+  --surface-editor: #ffffff;
+  --border-subtle: rgba(55, 53, 47, 0.09);
+  --border-muted: rgba(55, 53, 47, 0.13);
+  --text-sub: #6b6966;
+  --text-output: #37352f;
+  --xterm-bg: #ffffff;
+  --xterm-fg: #37352f;
+}

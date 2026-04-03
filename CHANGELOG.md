@@ -2,7 +2,39 @@
 
 這份文件用來記錄這個專案的重要變更。
 
-目前這個 repository 已經進入第一代 web workspace 版本，因此最重要的是先把目前專案的整體狀態整理清楚。
+本文件從 `2026-04-01` 起開始採用固定版本說明格式。
+
+## 如何閱讀版本
+
+- 版本編號採用 `MAJOR.MINOR.PATCH`
+- `MAJOR`：有不相容變更，升級後可能需要調整既有流程或資料
+- `MINOR`：向下相容的新功能、新卡片能力或新的工作流支援
+- `PATCH`：向下相容的修正、穩定性改善、文件補充或測試更新
+- 尚未發版的內容先放在 `Unreleased`
+- 正式發版時，再把 `Unreleased` 內容整理到對應版本節點
+
+## [Unreleased]
+
+### 新增
+
+- 建立後續可持續維護的 changelog 與版本說明規則
+- 開始以 `Unreleased` 區塊記錄尚未發版的變更
+
+## [1.0.1] - 2026-04-03
+
+### 重構
+
+- CSS 模組化：將單一 `style.css`（2883 行）拆分為 16 個獨立模組，對應 JS 卡片模組結構
+  - 基礎：`variables.css`、`base.css`、`toolbar.css`
+  - 工作區：`workspace.css`、`context-menu.css`、`card-base.css`
+  - 卡片類型：`terminal-card.css`、`project-card.css`、`agent-output-card.css`、`prompt-card.css`、`markdown-card.css`、`mission-card.css`、`input-card.css`、`output-card.css`
+  - 主題與響應式：`theme-light.css`、`responsive.css`
+- 移除 Prompt Card 樣式的 3 份重複定義，合併為單一完整版本
+- Light theme overrides 集中管理至 `theme-light.css`
+
+### 測試
+
+- 新增 `test/css-modules.test.js`（15 個測試），驗證 CSS 模組結構完整性、selector 不重複、括號平衡、JS↔CSS 對應關係等
 
 ## [1.0.0] - 2026-04-01
 

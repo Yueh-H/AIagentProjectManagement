@@ -1,0 +1,110 @@
+/* ── Terminal Card ── */
+
+.pane-wrapper[data-card-type="terminal"] .pane-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.pane-wrapper[data-card-type="terminal"] .xterm-container {
+  position: relative;
+  inset: auto;
+  flex: 1;
+  min-height: 0;
+  padding: 4px 8px 8px;
+}
+
+/* Terminal cwd bar */
+.terminal-cwd-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  font-size: 11px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.terminal-cwd-label {
+  flex: 1;
+  color: var(--text-muted);
+  font-family: "SF Mono", Menlo, Monaco, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminal-cwd-browse {
+  appearance: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px;
+  line-height: 1;
+}
+
+.terminal-cwd-browser {
+  max-height: 200px;
+  overflow: auto;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-deep);
+  flex-shrink: 0;
+}
+
+.terminal-cwd-browser-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+  position: sticky;
+  top: 0;
+  background: var(--surface-deep);
+  z-index: 1;
+}
+
+.terminal-cwd-browser-path {
+  font-size: 10px;
+  font-family: "SF Mono", Menlo, monospace;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminal-cwd-select-btn {
+  appearance: none;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  background: rgba(22, 163, 74, 0.15);
+  color: #86efac;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.terminal-cwd-browser-list { padding: 2px 4px; }
+
+.terminal-cwd-browser-item {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.terminal-cwd-browser-item:hover {
+  background: var(--surface-input, rgba(255, 255, 255, 0.08));
+}
+
+/* xterm */
+.xterm {
+  height: 100%;
+  border-radius: 12px;
+}
+
+.xterm .xterm-viewport {
+  border-radius: 10px;
+}

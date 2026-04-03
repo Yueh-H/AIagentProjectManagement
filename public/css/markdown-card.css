@@ -1,0 +1,146 @@
+/* ── Markdown Card ── */
+
+.markdown-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 14px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.markdown-card-editor-shell {
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  background: var(--surface-editor);
+  overflow: hidden;
+}
+
+.markdown-card-editor-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 18px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ── Toast UI Editor overrides ── */
+
+.markdown-card-editor-shell .toastui-editor-defaultUI {
+  border: none;
+  background: transparent;
+  height: 100%;
+}
+
+.markdown-card-editor-shell .toastui-editor-ww-mode .toastui-editor-md-container {
+  display: none !important;
+}
+
+.markdown-card-editor-shell .toastui-editor-md-mode .toastui-editor-ww-container {
+  display: none !important;
+}
+
+.markdown-card-editor-shell .toastui-editor-mode-switch,
+.markdown-card-editor-shell .toastui-editor-md-tab-container {
+  display: none;
+}
+
+.markdown-card-editor-shell .toastui-editor-defaultUI-toolbar {
+  display: none !important;
+}
+
+.markdown-card-editor-shell .toastui-editor-toolbar-group {
+  border-color: var(--border-subtle);
+}
+
+.markdown-card-editor-shell .toastui-editor-main,
+.markdown-card-editor-shell .toastui-editor-md-container,
+.markdown-card-editor-shell .toastui-editor-ww-container {
+  background: transparent;
+}
+
+.markdown-card-editor-shell .toastui-editor-md-container,
+.markdown-card-editor-shell .toastui-editor-ww-container,
+.markdown-card-editor-shell .toastui-editor-main-container {
+  color: var(--text-output);
+}
+
+.markdown-card-editor-shell .toastui-editor-contents,
+.markdown-card-editor-shell .toastui-editor-contents p,
+.markdown-card-editor-shell .toastui-editor-contents h1,
+.markdown-card-editor-shell .toastui-editor-contents h2,
+.markdown-card-editor-shell .toastui-editor-contents h3,
+.markdown-card-editor-shell .toastui-editor-contents h4,
+.markdown-card-editor-shell .toastui-editor-contents h5,
+.markdown-card-editor-shell .toastui-editor-contents h6,
+.markdown-card-editor-shell .ProseMirror {
+  color: var(--text-output);
+}
+
+.markdown-card-editor-shell .toastui-editor-ww-container .ProseMirror {
+  padding: 20px 22px 26px;
+}
+
+/* Custom blocks */
+.markdown-card-editor-shell .markdown-card-toggle-block {
+  margin: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-alpha) 78%, transparent);
+  overflow: hidden;
+}
+
+.markdown-card-editor-shell .markdown-card-toggle-summary {
+  cursor: pointer;
+  padding: 10px 14px;
+  font-weight: 600;
+}
+
+.markdown-card-editor-shell .markdown-card-toggle-body {
+  padding: 0 14px 12px;
+  white-space: pre-wrap;
+  color: var(--text-main);
+}
+
+.markdown-card-editor-shell .markdown-card-math-block {
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-alpha) 82%, transparent);
+  white-space: pre-wrap;
+  font-family: "SFMono-Regular", "SF Mono", Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.markdown-card-editor-shell .toastui-editor-contents code {
+  background: rgba(15, 23, 42, 0.12);
+}
+
+.markdown-card-editor-shell .toastui-editor-contents pre {
+  background: rgba(15, 23, 42, 0.14);
+}
+
+.markdown-card-editor-shell .toastui-editor-toolbar-icons {
+  opacity: 0.86;
+}
+
+.markdown-card-editor-shell .toastui-editor-toolbar-icons:not(:disabled):hover,
+.markdown-card-editor-shell .toastui-editor-toolbar-icons.active {
+  background-color: var(--surface-deep);
+}
+
+.markdown-card-editor-shell .toastui-editor-popup,
+.markdown-card-editor-shell .toastui-editor-context-menu,
+.markdown-card-editor-shell .toastui-editor-dropdown-toolbar {
+  color: var(--text-main);
+}
+
+.markdown-card-editor-shell .toastui-editor-dark.toastui-editor-defaultUI,
+.markdown-card-editor-shell .toastui-editor-dark .toastui-editor-md-container,
+.markdown-card-editor-shell .toastui-editor-dark .toastui-editor-ww-container {
+  background: transparent;
+}
