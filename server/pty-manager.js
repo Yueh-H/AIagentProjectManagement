@@ -33,7 +33,7 @@ function createPtyManager({
     }
   }
 
-  function createPty(paneId, cols, rows) {
+  function createPty(paneId, cols, rows, cwd) {
     ensureSpawnHelperExecutable();
 
     const isWindows = osImpl.platform() === 'win32';
@@ -43,7 +43,7 @@ function createPtyManager({
       name: 'xterm-256color',
       cols: cols || 80,
       rows: rows || 24,
-      cwd: processImpl.env.HOME,
+      cwd: cwd || processImpl.env.HOME,
       env: processImpl.env,
     });
     ptys.set(paneId, ptyProcess);

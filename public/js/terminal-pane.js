@@ -36,9 +36,35 @@ class TerminalPane extends BaseCard {
     };
     this._idleTimer = null;
 
+    // Folder selector bar
+    this._cwd = data?.cwd || '';
+    this.cwdBarEl = document.createElement('div');
+    this.cwdBarEl.className = 'terminal-cwd-bar';
+
+    this.cwdLabelEl = document.createElement('span');
+    this.cwdLabelEl.className = 'terminal-cwd-label';
+    this.cwdLabelEl.textContent = this._cwd || '~';
+
+    this.cwdBrowseEl = document.createElement('button');
+    this.cwdBrowseEl.type = 'button';
+    this.cwdBrowseEl.className = 'terminal-cwd-browse';
+    this.cwdBrowseEl.textContent = '📁';
+    this.cwdBrowseEl.title = 'Change working directory';
+    this.cwdBrowseEl.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this._openCwdPicker();
+    });
+
+    this.cwdBarEl.append(this.cwdLabelEl, this.cwdBrowseEl);
+
+    this.cwdBrowserEl = document.createElement('div');
+    this.cwdBrowserEl.className = 'terminal-cwd-browser';
+    this.cwdBrowserEl.hidden = true;
+
     this.containerEl = document.createElement('div');
     this.containerEl.className = 'xterm-container';
-    this.bodyEl.appendChild(this.containerEl);
+    this.bodyEl.append(this.cwdBarEl, this.cwdBrowserEl, this.containerEl);
 
     this.terminal = new window.Terminal({
       cursorBlink: true,
@@ -121,6 +147,7 @@ class TerminalPane extends BaseCard {
           paneId: this.paneId,
           cols,
           rows,
+          cwd: this._cwd || undefined,
         }));
       }
       this.scheduleFit();
@@ -195,7 +222,84 @@ class TerminalPane extends BaseCard {
       updatedAt: this.runtime.updatedAt,
       exitCode: this.runtime.exitCode,
       programBuffer: this.programBuffer,
+      cwd: this._cwd,
     };
+  }
+
+  async _openCwdPicker() {
+    if (!this.cwdBrowserEl.hidden) {
+      this.cwdBrowserEl.hidden = true;
+      return;
+    }
+    this.cwdBrowserEl.hidden = false;
+    await this._loadCwdDirectory(this._cwd || undefined);
+  }
+
+  async _loadCwdDirectory(dirPath) {
+    this.cwdBrowserEl.innerHTML = '<div style="padding:8px;font-size:11px;color:var(--text-muted)">Loading...</div>';
+    try {
+      const url = dirPath ? `/api/browse?path=${encodeURIComponent(dirPath)}` : '/api/browse';
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`${res.status}`);
+      const data = await res.json();
+
+      this.cwdBrowserEl.innerHTML = '';
+
+      const headerEl = document.createElement('div');
+      headerEl.className = 'terminal-cwd-browser-header';
+
+      const pathEl = document.createElement('span');
+      pathEl.className = 'terminal-cwd-browser-path';
+      pathEl.textContent = data.current;
+
+      const selectBtn = document.createElement('button');
+      selectBtn.type = 'button';
+      selectBtn.className = 'terminal-cwd-select-btn';
+      selectBtn.textContent = '✓ Select';
+      selectBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this._cwd = data.current;
+        this.cwdLabelEl.textContent = data.current;
+        this.cwdBrowserEl.hidden = true;
+        this.requestPersist();
+        // cd into the directory in the running terminal
+        if (this.ws.readyState === WebSocket.OPEN) {
+          this.ws.send(JSON.stringify({
+            type: 'input',
+            clientId: this.clientId,
+            paneId: this.paneId,
+            data: `cd ${JSON.stringify(data.current)}\r`,
+          }));
+        }
+      });
+
+      headerEl.append(pathEl, selectBtn);
+      this.cwdBrowserEl.appendChild(headerEl);
+
+      const listEl = document.createElement('div');
+      listEl.className = 'terminal-cwd-browser-list';
+
+      if (data.parent && data.parent !== data.current) {
+        const parentItem = document.createElement('div');
+        parentItem.className = 'terminal-cwd-browser-item';
+        parentItem.textContent = '📁 ..';
+        parentItem.addEventListener('click', (e) => { e.stopPropagation(); this._loadCwdDirectory(data.parent); });
+        listEl.appendChild(parentItem);
+      }
+
+      data.entries.filter(e => e.type === 'dir').forEach((entry) => {
+        const item = document.createElement('div');
+        item.className = 'terminal-cwd-browser-item';
+        item.textContent = `📁 ${entry.name}`;
+        item.addEventListener('click', (e) => { e.stopPropagation(); this._loadCwdDirectory(entry.path); });
+        listEl.appendChild(item);
+      });
+
+      this.cwdBrowserEl.appendChild(listEl);
+    } catch (err) {
+      this.cwdBrowserEl.innerHTML = `<div style="padding:8px;color:#f87171;font-size:11px">Error: ${err.message}</div>`;
+    }
   }
 
   getRuntimeInfo() {

@@ -68,6 +68,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // Cmd/Ctrl + Shift + G → group selected cards into a section
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'g') {
+      if (isEditableTarget(e.target)) return;
+      e.preventDefault();
+      manager.groupSelectedIntoSection();
+      return;
+    }
+
     if (e.ctrlKey && e.shiftKey) {
       const type = shortcutMap[e.key];
       if (type) {

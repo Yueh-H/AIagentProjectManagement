@@ -63,6 +63,7 @@ test('state store saves layout and restores pane buffers from sqlite', () => {
         programBuffer: '',
       },
     ],
+    sections: [],
   });
 
   store.saveLayout('client-a', {
@@ -89,6 +90,7 @@ test('state store saves layout and restores pane buffers from sqlite', () => {
         programBuffer: '',
       },
     ],
+    sections: [],
   });
 
   store.close();
@@ -151,6 +153,7 @@ test('state store preserves agent-output and markdown card data without terminal
         programBuffer: '',
       },
     ],
+    sections: [],
   });
 
   store.close();
@@ -188,6 +191,7 @@ test('state store keeps program output scoped to the correct terminal pane', () 
         programBuffer: 'hi\n',
       },
     ],
+    sections: [],
   });
 
   store.close();

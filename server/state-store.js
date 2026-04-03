@@ -54,8 +54,13 @@ function createStateStore({
     db.exec(`ALTER TABLE pane_buffers ADD COLUMN program_buffer TEXT NOT NULL DEFAULT ''`);
   } catch { /* column already exists */ }
 
+  // Migration: add sections_json column for workspace sections
+  try {
+    db.exec(`ALTER TABLE client_layouts ADD COLUMN sections_json TEXT NOT NULL DEFAULT '[]'`);
+  } catch { /* column already exists */ }
+
   const getLayoutStmt = db.prepare(`
-    SELECT active_pane_id, panes_json
+    SELECT active_pane_id, panes_json, sections_json
     FROM client_layouts
     WHERE client_id = ?
   `);
@@ -65,11 +70,12 @@ function createStateStore({
     WHERE client_id = ?
   `);
   const saveLayoutStmt = db.prepare(`
-    INSERT INTO client_layouts (client_id, active_pane_id, panes_json, updated_at)
-    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+    INSERT INTO client_layouts (client_id, active_pane_id, panes_json, sections_json, updated_at)
+    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT(client_id) DO UPDATE SET
       active_pane_id = excluded.active_pane_id,
       panes_json = excluded.panes_json,
+      sections_json = excluded.sections_json,
       updated_at = CURRENT_TIMESTAMP
   `);
   const deleteAllBuffersStmt = db.prepare(`
@@ -113,6 +119,8 @@ function createStateStore({
     const buffers = new Map(bufferRows.map((r) => [r.pane_id, r.buffer || '']));
     const programBuffers = new Map(bufferRows.map((r) => [r.pane_id, r.program_buffer || '']));
 
+    const sections = layoutRow?.sections_json ? JSON.parse(layoutRow.sections_json) : [];
+
     return {
       activePaneId: layoutRow?.active_pane_id || null,
       panes: panes.map((pane) => ({
@@ -120,6 +128,7 @@ function createStateStore({
         buffer: pane.type === 'terminal' ? (buffers.get(pane.id) || '') : '',
         programBuffer: pane.type === 'terminal' ? (programBuffers.get(pane.id) || '') : '',
       })),
+      sections,
     };
   }
 
@@ -131,7 +140,8 @@ function createStateStore({
       ? state.activePaneId
       : (panes[panes.length - 1]?.id || null);
 
-    saveLayoutStmt.run(clientId, activePaneId, JSON.stringify(panes));
+    const sections = Array.isArray(state.sections) ? state.sections : [];
+    saveLayoutStmt.run(clientId, activePaneId, JSON.stringify(panes), JSON.stringify(sections));
 
     if (!panes.length) {
       deleteAllBuffersStmt.run(clientId);

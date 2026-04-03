@@ -4,6 +4,8 @@ A browser-based workspace for running CLI agents and organizing work as draggabl
 
 See [CHANGELOG.md](./CHANGELOG.md) for the current project snapshot and version history.
 
+Versioning follows `MAJOR.MINOR.PATCH`, and in-progress changes should be added to the `Unreleased` section in `CHANGELOG.md` before release.
+
 This project combines:
 
 - terminal sessions powered by `node-pty` and `xterm.js`

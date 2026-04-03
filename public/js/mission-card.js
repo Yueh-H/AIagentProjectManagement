@@ -67,8 +67,13 @@ function normalizeMissionData(data = {}) {
     blockers: normalizeMissionText(data.blockers),
     nextStep: normalizeMissionText(data.nextStep),
     sourcePaneId: typeof data.sourcePaneId === 'string' ? data.sourcePaneId : '',
+    sessionId: typeof data.sessionId === 'string' && data.sessionId ? data.sessionId : crypto.randomUUID(),
+    parentInputId: typeof data.parentInputId === 'string' ? data.parentInputId : '',
+    workDir: normalizeMissionText(data.workDir),
+    executionPrompt: normalizeMissionText(data.executionPrompt || data.prompt),
     status: ['pending', 'running', 'done', 'failed'].includes(data.status) ? data.status : 'pending',
     statusUpdatedAt: typeof data.statusUpdatedAt === 'number' ? data.statusUpdatedAt : Date.now(),
+    claudeMessages: Array.isArray(data.claudeMessages) ? data.claudeMessages : [],
   };
 }
 
@@ -355,18 +360,98 @@ class MissionCard extends BaseCard {
 
     this.ownerSectionEl.append(ownerHeaderEl, this.ownerMetaEl, this.ownerDescriptionEl, this.focusButtonEl);
 
+    // Claude response section
+    this.responseSectionEl = document.createElement('section');
+    this.responseSectionEl.className = 'mission-response-section';
+
+    const responseHeaderEl = document.createElement('div');
+    responseHeaderEl.className = 'mission-section-header';
+
+    const responseTitleWrapEl = document.createElement('div');
+    const responseTitleEl = document.createElement('div');
+    responseTitleEl.className = 'mission-section-title';
+    responseTitleEl.textContent = 'AI 回應';
+
+    this.responseStatusEl = document.createElement('div');
+    this.responseStatusEl.className = 'mission-section-caption';
+    this.responseStatusEl.textContent = '等待 Prompt 卡片輸入...';
+
+    responseTitleWrapEl.append(responseTitleEl, this.responseStatusEl);
+
+    this.clearResponseButtonEl = document.createElement('button');
+    this.clearResponseButtonEl.type = 'button';
+    this.clearResponseButtonEl.className = 'mission-add-checklist-button';
+    this.clearResponseButtonEl.textContent = '清除';
+    this.clearResponseButtonEl.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.data.claudeMessages = [];
+      this._renderClaudeResponse();
+      this.requestPersist();
+    });
+
+    responseHeaderEl.append(responseTitleWrapEl, this.clearResponseButtonEl);
+
+    this.responseOutputEl = document.createElement('div');
+    this.responseOutputEl.className = 'mission-response-output';
+
+    this.responseSectionEl.append(responseHeaderEl, this.responseOutputEl);
+
+    // Execution section
+    this.execSectionEl = document.createElement('section');
+    this.execSectionEl.className = 'mission-exec-section';
+
+    const execLabelEl = document.createElement('div');
+    execLabelEl.className = 'mission-section-title';
+    execLabelEl.textContent = '執行 Prompt';
+
+    this.execPromptEl = this._createTextInput({
+      key: 'executionPrompt',
+      placeholder: '給 Claude 執行的 prompt（自動拆任務時會自動填入）',
+      rows: 3,
+      className: 'mission-text-input',
+    });
+
+    this.executeButtonEl = document.createElement('button');
+    this.executeButtonEl.type = 'button';
+    this.executeButtonEl.className = 'mission-execute-button';
+    this.executeButtonEl.textContent = '\u25B6\uFE0F Execute';
+    this.executeButtonEl.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this._executePrompt();
+    });
+
+    this.execSectionEl.append(execLabelEl, this.execPromptEl, this.executeButtonEl);
+
+    // Source Input Card indicator
+    this.sourceInputEl = document.createElement('div');
+    this.sourceInputEl.className = 'mission-source-input';
+    this.sourceInputEl.hidden = !this.data.parentInputId;
+    this.sourceInputEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (this.data.parentInputId && this.onRequestFocusCard) {
+        this.onRequestFocusCard(this.data.parentInputId);
+      }
+    });
+    this._updateSourceInputLabel();
+
     this.bodyEl.append(
+      this.sourceInputEl,
       this.statusPanelEl,
       this.goalSection.root,
       this.criteriaSectionEl,
       this.detailGridEl,
+      this.execSectionEl,
       this.ownerSectionEl,
+      this.responseSectionEl,
     );
 
     this._renderChecklist();
     this._applyStatus();
     this._syncSourceOptions();
     this._renderOwnerSection();
+    this._renderClaudeResponse();
     this._startRelativeTimeUpdater();
   }
 
@@ -567,10 +652,219 @@ class MissionCard extends BaseCard {
     }, 10_000);
   }
 
-  receiveWorkspaceState({ terminals }) {
+  handleMessage(msg) {
+    if (!this.data.sessionId || msg.sessionId !== this.data.sessionId) return;
+
+    if (msg.type === 'claude-data') {
+      this.data.claudeMessages.push(msg.data);
+      if (this.data.claudeMessages.length > 200) {
+        this.data.claudeMessages = this.data.claudeMessages.slice(-200);
+      }
+      this._renderClaudeResponse();
+    }
+
+    if (msg.type === 'claude-status') {
+      if (msg.status === 'running') {
+        this.responseStatusEl.textContent = 'Claude 正在處理...';
+        if (this.data.status === 'pending') {
+          this.data.status = 'running';
+          this.data.statusUpdatedAt = Date.now();
+          this._applyStatus();
+          this.requestPersist();
+        }
+      } else if (msg.status === 'done') {
+        this.responseStatusEl.textContent = `完成 (exit ${msg.code ?? 0})`;
+        if (this.data.status === 'running') {
+          this.data.status = 'done';
+          this.data.statusUpdatedAt = Date.now();
+          this._applyStatus();
+          this.requestPersist();
+        }
+      }
+    }
+
+    if (msg.type === 'claude-error') {
+      this.responseStatusEl.textContent = `錯誤: ${msg.message}`;
+      this._isExecuting = false;
+      if (this._execTimer) { clearInterval(this._execTimer); this._execTimer = null; }
+      this.executeButtonEl.disabled = false;
+      this.executeButtonEl.textContent = '\u25B6\uFE0F Execute';
+      if (this.data.status === 'running') {
+        this.data.status = 'failed';
+        this.data.statusUpdatedAt = Date.now();
+        this._applyStatus();
+        this.requestPersist();
+      }
+    }
+
+    if (msg.type === 'claude-status' && msg.status === 'done') {
+      this._isExecuting = false;
+      if (this._execTimer) { clearInterval(this._execTimer); this._execTimer = null; }
+      this.executeButtonEl.disabled = false;
+      this.executeButtonEl.textContent = '\u25B6\uFE0F Execute';
+    }
+  }
+
+  _executePrompt() {
+    const prompt = this.data.executionPrompt?.trim();
+    if (!prompt || this._isExecuting) return;
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+
+    this._isExecuting = true;
+    this.executeButtonEl.disabled = true;
+    this._execStartTime = Date.now();
+    if (this._execTimer) clearInterval(this._execTimer);
+    const updateBtn = () => {
+      const secs = Math.floor((Date.now() - this._execStartTime) / 1000);
+      const m = Math.floor(secs / 60);
+      const s = secs % 60;
+      this.executeButtonEl.textContent = `⏳ Running... (${m > 0 ? m + 'm ' : ''}${s}s)`;
+    };
+    updateBtn();
+    this._execTimer = setInterval(updateBtn, 1000);
+
+    // Include mission context
+    const context = this.getMissionContext();
+    const fullPrompt = `${context}\n\n---\n\n${prompt}`;
+
+    this.ws.send(JSON.stringify({
+      type: 'claude-exec',
+      sessionId: this.data.sessionId,
+      paneId: this.paneId,
+      prompt: fullPrompt,
+      workDir: this.data.workDir || undefined,
+      model: 'opus',
+      effort: 'low',
+      permissionMode: 'acceptEdits',
+    }));
+  }
+
+  _renderMarkdown(markdown) {
+    const container = document.createElement('div');
+    container.className = 'mission-md-rendered';
+
+    const Viewer = window.toastui?.Editor?.factory;
+    if (Viewer) {
+      try {
+        Viewer({
+          el: container,
+          viewer: true,
+          initialValue: markdown,
+          theme: this._getAppTheme() === 'dark' ? 'dark' : undefined,
+        });
+        return container;
+      } catch { /* fall through to basic renderer */ }
+    }
+
+    // Fallback: basic HTML rendering
+    const html = markdown
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/^- (.+)$/gm, '<li>$1</li>')
+      .replace(/^---$/gm, '<hr>')
+      .replace(/\n/g, '<br>');
+    container.innerHTML = html;
+    return container;
+  }
+
+  _getAppTheme() {
+    return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  }
+
+  _renderClaudeResponse() {
+    this.responseOutputEl.innerHTML = '';
+
+    if (!this.data.claudeMessages.length) {
+      this.responseOutputEl.textContent = '尚無 AI 回應。從 Prompt 卡片發送指令開始。';
+      return;
+    }
+
+    for (const msg of this.data.claudeMessages) {
+      const el = document.createElement('div');
+
+      if (msg.type === 'assistant') {
+        const content = msg.message?.content;
+        if (!content) continue;
+        const text = Array.isArray(content)
+          ? content.filter(b => b.type === 'text').map(b => b.text).join('\n')
+          : (typeof content === 'string' ? content : '');
+        if (!text) continue;
+
+        el.className = 'agent-block agent-block-agent';
+        const label = document.createElement('span');
+        label.className = 'agent-block-label';
+        label.textContent = '\u23FA Agent';
+        el.append(label, this._renderMarkdown(text));
+      } else if (msg.type === 'result' && msg.result) {
+        const resultText = typeof msg.result === 'string' ? msg.result : JSON.stringify(msg.result, null, 2);
+        el.className = 'agent-block agent-block-agent';
+        const label = document.createElement('span');
+        label.className = 'agent-block-label';
+        label.textContent = '\u2705 結果';
+        el.append(label, this._renderMarkdown(resultText));
+      } else if (msg.type === 'error') {
+        el.className = 'agent-block agent-block-error';
+        const label = document.createElement('span');
+        label.className = 'agent-block-label';
+        label.textContent = '\u274C 錯誤';
+        const pre = document.createElement('pre');
+        pre.className = 'agent-block-text';
+        pre.textContent = msg.text || msg.message || '';
+        el.append(label, pre);
+      } else {
+        continue;
+      }
+
+      if (el.children.length) {
+        this.responseOutputEl.appendChild(el);
+      }
+    }
+
+    this.responseOutputEl.scrollTop = this.responseOutputEl.scrollHeight;
+  }
+
+  /**
+   * Returns mission context as a structured string for Claude prompts.
+   */
+  getMissionContext() {
+    const criteria = this.data.completionCriteria
+      .filter(c => c.text?.trim())
+      .map(c => `- [${c.done ? 'x' : ' '}] ${c.text}`)
+      .join('\n');
+
+    return [
+      `## 任務：${this.getTitle()}`,
+      `**目標：** ${this.data.goal || '（未設定）'}`,
+      criteria ? `**完成標準：**\n${criteria}` : '',
+      this.data.blockers ? `**阻塞點：** ${this.data.blockers}` : '',
+      this.data.nextStep ? `**下一步：** ${this.data.nextStep}` : '',
+      `**狀態：** ${MISSION_STATUS_META[this.data.status]?.label || this.data.status}`,
+      this.data.statusSummary ? `**狀態摘要：** ${this.data.statusSummary}` : '',
+    ].filter(Boolean).join('\n');
+  }
+
+  _updateSourceInputLabel() {
+    if (!this.data.parentInputId) {
+      this.sourceInputEl.hidden = true;
+      return;
+    }
+    this.sourceInputEl.hidden = false;
+    const parent = this._allCards?.find(c => c.id === this.data.parentInputId);
+    const name = parent?.title || 'Input Card';
+    this.sourceInputEl.textContent = `📋 來自：${name}`;
+  }
+
+  receiveWorkspaceState({ terminals, cards }) {
     this.terminals = Array.isArray(terminals) ? terminals : [];
+    this._allCards = Array.isArray(cards) ? cards : [];
     this._syncSourceOptions();
     this._renderOwnerSection();
+    this._updateSourceInputLabel();
   }
 
   getPersistData() {
@@ -585,6 +879,9 @@ class MissionCard extends BaseCard {
       blockers: this.data.blockers,
       nextStep: this.data.nextStep,
       sourcePaneId: this.data.sourcePaneId,
+      sessionId: this.data.sessionId,
+      parentInputId: this.data.parentInputId,
+      executionPrompt: this.data.executionPrompt,
       status: this.data.status,
       statusUpdatedAt: this.data.statusUpdatedAt,
       instruction: goal,

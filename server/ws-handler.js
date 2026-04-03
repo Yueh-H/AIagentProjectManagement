@@ -2,6 +2,7 @@ const WebSocket = require('ws');
 const ptyManager = require('./pty-manager');
 const stateStore = require('./state-store');
 const workspaceSync = require('./workspace-sync');
+const claudeRunner = require('./claude-runner');
 
 function getPtyKey(clientId, paneId) {
   return clientId ? `${clientId}:${paneId}` : paneId;
@@ -12,6 +13,7 @@ function createConnectionHandler({
   webSocketImpl = WebSocket,
   stateStoreImpl = stateStore,
   workspaceSyncImpl = workspaceSync,
+  claudeRunnerImpl = claudeRunner,
 } = {}) {
   const ECHO_WINDOW_MS = 300;
 
@@ -49,7 +51,7 @@ function createConnectionHandler({
           break;
         }
         case 'create': {
-          const { paneId, cols, rows } = msg;
+          const { paneId, cols, rows, cwd } = msg;
           currentClientId = msg.clientId || currentClientId;
           const ptyKey = getPtyKey(currentClientId, paneId);
           try {
@@ -58,7 +60,7 @@ function createConnectionHandler({
             const echoTracker = { lastInputAt: 0 };
             echoTrackers.set(ptyKey, echoTracker);
 
-            const p = ptyManagerImpl.createPty(ptyKey, cols, rows);
+            const p = ptyManagerImpl.createPty(ptyKey, cols, rows, cwd);
             p.onData((data) => {
               // Tag output origin: if PTY output arrives within ECHO_WINDOW_MS
               // of the last user keystroke, it's likely echo of user input.
@@ -120,6 +122,69 @@ function createConnectionHandler({
           }
           break;
         }
+        case 'claude-exec': {
+          const { sessionId, prompt, paneId, workDir, model, permissionMode, effort } = msg;
+          if (!sessionId || !prompt) break;
+
+          // Notify client that execution started
+          if (ws.readyState === webSocketImpl.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'claude-status',
+              paneId,
+              sessionId,
+              status: 'running',
+            }));
+          }
+
+          claudeRunnerImpl.exec({
+            sessionId,
+            prompt,
+            workDir: workDir || process.env.HOME,
+            model: model || undefined,
+            effort: effort || undefined,
+            permissionMode: permissionMode || undefined,
+            onData: (obj) => {
+              if (ws.readyState === webSocketImpl.OPEN) {
+                ws.send(JSON.stringify({
+                  type: 'claude-data',
+                  paneId,
+                  sessionId,
+                  data: obj,
+                }));
+              }
+            },
+            onError: (text) => {
+              if (ws.readyState === webSocketImpl.OPEN) {
+                ws.send(JSON.stringify({
+                  type: 'claude-error',
+                  paneId,
+                  sessionId,
+                  message: text,
+                }));
+              }
+            },
+            onClose: ({ code, signal }) => {
+              if (ws.readyState === webSocketImpl.OPEN) {
+                ws.send(JSON.stringify({
+                  type: 'claude-status',
+                  paneId,
+                  sessionId,
+                  status: 'done',
+                  code,
+                  signal,
+                }));
+              }
+            },
+          });
+          break;
+        }
+        case 'claude-abort': {
+          const { sessionId } = msg;
+          if (sessionId) {
+            claudeRunnerImpl.killSession(sessionId);
+          }
+          break;
+        }
       }
     });
 
@@ -130,6 +195,7 @@ function createConnectionHandler({
       }
       paneKeys.clear();
       echoTrackers.clear();
+      claudeRunnerImpl.killAll();
     });
   };
 }

@@ -20,6 +20,42 @@
 - 建立後續可持續維護的 changelog 與版本說明規則
 - 開始以 `Unreleased` 區塊記錄尚未發版的變更
 
+## [1.1.0] - 2026-04-03
+
+### 新增
+
+- **Claude CLI 整合**：新增 `server/claude-runner.js`，透過 `claude -p` 指令管理 Claude Code CLI session
+  - 支援 session 持久化（`--session-id` / `-r`）
+  - 支援 model、effort、permissionMode 參數
+  - 並行上限控制（maxConcurrent），超額自動排隊
+  - WebSocket 新增 `claude-exec` / `claude-abort` 訊息類型
+- **Input Card**（`public/js/input-card.js`）：需求輸入卡片，可設定需求、完成標準、工作目錄、限制條件
+  - 支援任務拆分（呼叫 Claude 自動拆解為子任務）
+  - 支援逐一執行 / 平行執行子任務
+  - 內建資料夾瀏覽器選擇工作目錄
+- **Output Card**（`public/js/output-card.js`）：執行結果匯總卡片
+  - 顯示各子任務進度與狀態
+  - 一鍵產生驗收摘要報告
+- **Prompt Card**（`public/js/prompt-card.js`）：指令發送卡片
+  - 可選擇目標 Mission Card 發送 prompt
+  - 支援檔案上傳附加、歷史紀錄重送
+  - 支援 Claude CLI session 模式與 terminal 直接輸入模式切換
+- **Workspace Section**（`public/js/workspace-section.js`）：卡片群組容器
+  - 視覺化群組標題與邊界框
+  - 支援拖曳整組移動、右鍵選單管理
+- **Terminal Card 增強**：新增工作目錄選擇列（cwd bar）與資料夾瀏覽器
+- **Mission Card 增強**：
+  - 新增 AI 回應區塊，接收 Claude session 的結構化輸出
+  - 新增執行區塊，可直接從 Mission 卡片呼叫 Claude
+  - 支援 sessionId 綁定，自動接收對應 session 的回應
+- **Agent Output Card 增強**：支援 Claude session 綁定，接收並渲染結構化訊息
+- **PaneManager 增強**：
+  - Claude session 訊息路由（廣播至所有匹配 sessionId 的卡片）
+  - 多選卡片右鍵選單（批次關閉、批次換色）
+  - Section 群組選取狀態同步
+  - `translate3d` 優化 canvas 位移效能
+- **Server**：新增 `/api/browse` 目錄瀏覽 API
+
 ## [1.0.1] - 2026-04-03
 
 ### 重構

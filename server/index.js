@@ -9,6 +9,45 @@ const app = express();
 const server = http.createServer(app);
 
 app.use('/api', createApiRouter());
+
+// Directory browser API
+app.get('/api/browse', (req, res) => {
+  const fs = require('fs');
+  const targetPath = req.query.path || process.env.HOME || '/';
+
+  try {
+    const resolved = path.resolve(targetPath);
+    const entries = fs.readdirSync(resolved, { withFileTypes: true });
+
+    const dirs = [];
+    const files = [];
+
+    entries.forEach((entry) => {
+      if (entry.name.startsWith('.')) return; // skip hidden
+      const fullPath = path.join(resolved, entry.name);
+      if (entry.isDirectory()) {
+        dirs.push({ name: entry.name, path: fullPath, type: 'dir' });
+      } else {
+        try {
+          const stat = fs.statSync(fullPath);
+          files.push({ name: entry.name, path: fullPath, type: 'file', size: stat.size });
+        } catch { /* skip unreadable */ }
+      }
+    });
+
+    dirs.sort((a, b) => a.name.localeCompare(b.name));
+    files.sort((a, b) => a.name.localeCompare(b.name));
+
+    res.json({
+      current: resolved,
+      parent: path.dirname(resolved),
+      entries: [...dirs, ...files],
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // Serve static files
 app.use('/', express.static(path.join(__dirname, '..', 'public')));
 app.use('/xterm', express.static(path.join(__dirname, '..', 'node_modules', '@xterm')));

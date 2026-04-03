@@ -106,6 +106,7 @@ test('card service creates, updates and deletes writable cards while preserving 
         programBuffer: '',
       },
     ],
+    sections: [],
   });
 
   assert.deepEqual(broadcasts, [

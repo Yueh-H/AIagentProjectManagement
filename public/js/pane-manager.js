@@ -12,6 +12,8 @@ class PaneManager {
     this._cardRegistry = new Map();
     this._runtimeByPaneId = new Map();
     this._selectedPaneIds = new Set();
+    this._sections = new Map();   // sectionId → WorkspaceSection
+    this._sectionIdCounter = 0;
 
     // Create the infinite canvas element inside the container
     this.canvas = document.createElement('div');
@@ -81,6 +83,14 @@ class PaneManager {
 
       if (msg.type === 'card_deleted') {
         this._applyRemoteCardDelete(msg);
+        return;
+      }
+
+      // Route Claude session messages to all cards with matching sessionId
+      if (msg.type === 'claude-data' || msg.type === 'claude-status' || msg.type === 'claude-error') {
+        for (const pane of this.panes.values()) {
+          if (pane.handleMessage) pane.handleMessage(msg);
+        }
         return;
       }
 
@@ -208,8 +218,13 @@ class PaneManager {
   }
 
   _applyTransform() {
-    this.canvas.style.transform = `translate(${this._panX}px, ${this._panY}px) scale(${this._zoom})`;
-    this._zoomIndicator.textContent = `${Math.round(this._zoom * 100)}%`;
+    const px = Math.round(this._panX);
+    const py = Math.round(this._panY);
+    this.canvas.style.transform = `translate3d(${px}px, ${py}px, 0) scale(${this._zoom})`;
+    const zoomText = `${Math.round(this._zoom * 100)}%`;
+    if (this._zoomIndicator.textContent !== zoomText) {
+      this._zoomIndicator.textContent = zoomText;
+    }
   }
 
   _focusPane(paneId, options = {}) {
@@ -238,6 +253,12 @@ class PaneManager {
     this._selectedPaneIds = next;
     for (const [paneId, pane] of this.panes.entries()) {
       pane.setSelected?.(next.has(paneId));
+    }
+    // Sync section selected state
+    for (const section of this._sections.values()) {
+      const memberIds = section.getPaneIds().filter((id) => this.panes.has(id));
+      const allSelected = memberIds.length > 0 && memberIds.every((id) => next.has(id));
+      section.setSelected(allSelected);
     }
   }
 
@@ -314,6 +335,7 @@ class PaneManager {
   _updateSelectedGroupDrag(_originPaneId, session, deltaX, deltaY) {
     if (!session?.paneIds?.length) return;
 
+    const containerRect = this._getContainerRect();
     session.paneIds.forEach((paneId) => {
       const pane = this.panes.get(paneId);
       const startBounds = session.startBounds.get(paneId);
@@ -323,10 +345,11 @@ class PaneManager {
         startBounds,
         deltaX,
         deltaY,
-        this._getContainerRect()
+        containerRect
       );
       pane.setBounds(nextBounds, { notify: false, fit: false });
     });
+    this._refreshSectionBounds();
   }
 
   _endSelectedGroupDrag(_originPaneId, session) {
@@ -336,6 +359,7 @@ class PaneManager {
       const pane = this.panes.get(paneId);
       pane?.scheduleFit();
     });
+    this._refreshSectionBounds();
     this._persistLayout();
     this._refreshWorkspaceCards();
   }
@@ -501,6 +525,85 @@ class PaneManager {
     this._mountContextMenu(menu, clientX, clientY);
   }
 
+  _showSelectionContextMenu(clientX, clientY) {
+    const selectedIds = Array.from(this._selectedPaneIds).filter((id) => this.panes.has(id));
+    if (!selectedIds.length) return;
+
+    const menu = this._createContextMenu();
+    menu.classList.add('ctx-menu-selection');
+
+    const countLabel = document.createElement('div');
+    countLabel.className = 'ctx-menu-section-label';
+    countLabel.textContent = `已選取 ${selectedIds.length} 張卡片`;
+    menu.appendChild(countLabel);
+
+    menu.appendChild(this._createContextMenuDivider());
+
+    menu.appendChild(this._createContextMenuItem({
+      icon: '\u2715',
+      label: `Close All (${selectedIds.length})`,
+      onSelect: () => {
+        this._hideContextMenu();
+        [...selectedIds].forEach((id) => this.closePane(id));
+      },
+    }));
+
+    menu.appendChild(this._createContextMenuDivider());
+
+    const colorSection = document.createElement('div');
+    colorSection.className = 'ctx-menu-section';
+
+    const colorLabel = document.createElement('div');
+    colorLabel.className = 'ctx-menu-section-label';
+    colorLabel.textContent = 'Color';
+
+    const colorRow = document.createElement('div');
+    colorRow.className = 'ctx-menu-color-row';
+
+    window.BaseCard.getColorThemeEntries().forEach((theme) => {
+      const colorButton = document.createElement('button');
+      colorButton.type = 'button';
+      colorButton.className = 'ctx-menu-color-button';
+      colorButton.title = theme.label;
+      colorButton.setAttribute('aria-label', theme.label);
+      colorButton.style.setProperty('--ctx-color', theme.swatch);
+
+      if (theme.id === 'default') {
+        colorButton.classList.add('is-default');
+      }
+
+      colorButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        selectedIds.forEach((id) => {
+          const pane = this.panes.get(id);
+          pane?.setColorTheme?.(theme.id);
+        });
+        this._hideContextMenu();
+      });
+
+      colorRow.appendChild(colorButton);
+    });
+
+    colorSection.append(colorLabel, colorRow);
+    menu.appendChild(colorSection);
+
+    // Group into section option (if not already all in one section)
+    if (!this._findCommonSection(selectedIds)) {
+      menu.appendChild(this._createContextMenuDivider());
+      menu.appendChild(this._createContextMenuItem({
+        icon: '\u{1F4E6}',
+        label: 'Group into Section',
+        onSelect: () => {
+          this.groupSelectedIntoSection();
+          this._hideContextMenu();
+        },
+      }));
+    }
+
+    this._mountContextMenu(menu, clientX, clientY);
+  }
+
   _hideContextMenu() {
     if (this._ctxMenu) {
       this._ctxMenu.remove();
@@ -544,10 +647,37 @@ class PaneManager {
       panning = true;
       didMove = false;
       const paneEl = e.target.closest('.pane-wrapper');
-      contextMenuMode = paneEl ? 'pane' : 'canvas';
-      contextPaneId = paneEl?.dataset.paneId === this.activePaneId
-        ? paneEl.dataset.paneId
-        : null;
+      const sectionEl = e.target.closest('.workspace-section');
+
+      if (paneEl) {
+        const pid = paneEl.dataset.paneId;
+        // If the pane is part of a multi-selection, show group menu
+        if (this._selectedPaneIds.size >= 2 && this._selectedPaneIds.has(pid)) {
+          contextMenuMode = 'selection';
+        } else {
+          contextMenuMode = 'pane';
+        }
+        contextPaneId = pid;
+      } else if (sectionEl) {
+        const secId = sectionEl.dataset.sectionId;
+        const section = this._sections.get(secId);
+        if (section) {
+          // Select section's cards and show group menu
+          const paneIds = section.getPaneIds().filter((id) => this.panes.has(id));
+          if (paneIds.length) {
+            this._setSelectedPaneIds(paneIds);
+            this.setActive(null, { preserveSelection: true });
+            contextMenuMode = 'selection';
+            contextPaneId = null;
+          } else {
+            contextMenuMode = 'canvas';
+          }
+        } else {
+          contextMenuMode = 'canvas';
+        }
+      } else {
+        contextMenuMode = this._selectedPaneIds.size >= 2 ? 'selection' : 'canvas';
+      }
       startX = e.clientX;
       startY = e.clientY;
       startPanX = this._panX;
@@ -622,7 +752,9 @@ class PaneManager {
       this.container.classList.remove('is-panning');
 
       if (panning && !didMove) {
-        if (contextMenuMode === 'pane' && contextPaneId) {
+        if (contextMenuMode === 'selection') {
+          this._showSelectionContextMenu(e.clientX, e.clientY);
+        } else if (contextMenuMode === 'pane' && contextPaneId) {
           this._showPaneContextMenu(contextPaneId, e.clientX, e.clientY);
         } else if (contextMenuMode === 'canvas') {
           this._showCanvasContextMenu(e.clientX, e.clientY);
@@ -641,6 +773,7 @@ class PaneManager {
     this.container.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
       if (e.target.closest('.pane-wrapper')) return;
+      if (e.target.closest('.workspace-section')) return;
       if (this._ctxMenu?.contains(e.target)) return;
 
       this._hideContextMenu();
@@ -697,11 +830,204 @@ class PaneManager {
 
       e.preventDefault();
       this._hideContextMenu();
+      showWheelPanFeedback();
       this._panX -= e.deltaX;
       this._panY -= e.deltaY;
       this._applyTransform();
-      showWheelPanFeedback();
     }, { passive: false });
+  }
+
+  // ── Sections ──────────────────────────────────────────────
+
+  _newSectionId() {
+    return 'section-' + (++this._sectionIdCounter);
+  }
+
+  _trackSectionId(id) {
+    const match = /^section-(\d+)$/.exec(id);
+    if (match) {
+      this._sectionIdCounter = Math.max(this._sectionIdCounter, Number(match[1]));
+    }
+  }
+
+  groupSelectedIntoSection() {
+    const ids = Array.from(this._selectedPaneIds).filter((id) => this.panes.has(id));
+    if (ids.length < 1) return null;
+
+    // Check if all selected panes already belong to the same section
+    const existingSection = this._findCommonSection(ids);
+    if (existingSection) return existingSection;
+
+    // Remove selected panes from any existing sections first
+    for (const id of ids) {
+      for (const section of this._sections.values()) {
+        section.removePaneId(id);
+      }
+    }
+    this._pruneEmptySections();
+
+    const sectionId = this._newSectionId();
+    WorkspaceSection._counter = this._sectionIdCounter;
+    const section = new WorkspaceSection(sectionId, {
+      title: `Section ${this._sectionIdCounter}`,
+      paneIds: ids,
+    });
+
+    section.recomputeBounds(this.panes);
+    this._setupSectionCallbacks(section);
+
+    this._sections.set(sectionId, section);
+    // Insert section at the beginning of canvas so it sits behind cards
+    this.canvas.insertBefore(section.getElement(), this.canvas.firstChild);
+
+    this._persistLayout();
+    return section;
+  }
+
+  ungroupSection(sectionId) {
+    const section = this._sections.get(sectionId);
+    if (!section) return;
+    section.dispose();
+    this._sections.delete(sectionId);
+    this._persistLayout();
+  }
+
+  _findCommonSection(paneIds) {
+    for (const section of this._sections.values()) {
+      if (paneIds.every((id) => section.hasPaneId(id))) {
+        return section;
+      }
+    }
+    return null;
+  }
+
+  _pruneEmptySections() {
+    for (const [id, section] of this._sections.entries()) {
+      // Remove sections with no valid panes
+      const validPanes = section.getPaneIds().filter((pid) => this.panes.has(pid));
+      if (validPanes.length === 0) {
+        section.dispose();
+        this._sections.delete(id);
+      } else {
+        section.setPaneIds(validPanes);
+      }
+    }
+  }
+
+  _refreshSectionBounds() {
+    for (const section of this._sections.values()) {
+      section.recomputeBounds(this.panes);
+    }
+  }
+
+  _hydrateSections(sectionsData) {
+    if (!Array.isArray(sectionsData)) return;
+    for (const entry of sectionsData) {
+      if (!entry?.id) continue;
+      this._trackSectionId(entry.id);
+      WorkspaceSection._counter = this._sectionIdCounter;
+      const validPaneIds = (entry.paneIds || []).filter((id) => this.panes.has(id));
+      if (!validPaneIds.length) continue;
+
+      const section = new WorkspaceSection(entry.id, {
+        title: entry.title,
+        paneIds: validPaneIds,
+        bounds: entry.bounds,
+        color: entry.color,
+      });
+
+      section.recomputeBounds(this.panes);
+      this._setupSectionCallbacks(section);
+
+      this._sections.set(entry.id, section);
+      this.canvas.insertBefore(section.getElement(), this.canvas.firstChild);
+    }
+  }
+
+  _setupSectionCallbacks(section) {
+    section.onChanged = () => this._persistLayout();
+    section.onMenuClick = (secId, cx, cy) => this._showSectionContextMenu(secId, cx, cy);
+    section.onGetZoom = () => this._zoom;
+
+    section.onSectionSelect = () => {
+      const paneIds = section.getPaneIds().filter((id) => this.panes.has(id));
+      if (!paneIds.length) return;
+      this._setSelectedPaneIds(paneIds);
+      this.setActive(null, { preserveSelection: true });
+    };
+
+    let dragSession = null;
+
+    section.onSectionDragStart = () => {
+      const paneIds = section.getPaneIds().filter((id) => this.panes.has(id));
+      if (!paneIds.length) return;
+      this._setSelectedPaneIds(paneIds);
+      this.setActive(null, { preserveSelection: true });
+        dragSession = {
+        paneIds,
+        startBounds: new Map(paneIds.map((id) => [id, this.panes.get(id).getBounds()])),
+        sectionStartBounds: section.getBounds(),
+      };
+    };
+
+    section.onSectionDragMove = (_sectionId, deltaX, deltaY) => {
+      if (!dragSession) return;
+      const containerRect = this._getContainerRect();
+      dragSession.paneIds.forEach((paneId) => {
+        const pane = this.panes.get(paneId);
+        const startBounds = dragSession.startBounds.get(paneId);
+        if (!pane || !startBounds) return;
+        const nextBounds = window.PaneGeometry.translatePaneBounds(
+          startBounds, deltaX, deltaY, containerRect
+        );
+        pane.setBounds(nextBounds, { notify: false, fit: false });
+      });
+      // Directly translate section bounds instead of recomputing from cards
+      const sb = dragSession.sectionStartBounds;
+      section.setBounds({
+        x: sb.x + deltaX,
+        y: sb.y + deltaY,
+        width: sb.width,
+        height: sb.height,
+      });
+    };
+
+    section.onSectionDragEnd = () => {
+        if (!dragSession) return;
+      dragSession.paneIds.forEach((paneId) => {
+        const pane = this.panes.get(paneId);
+        pane?.scheduleFit();
+      });
+      this._refreshSectionBounds();
+      this._persistLayout();
+      this._refreshWorkspaceCards();
+      dragSession = null;
+    };
+  }
+
+  _showSectionContextMenu(sectionId, clientX, clientY) {
+    const menu = this._createContextMenu();
+
+    menu.appendChild(this._createContextMenuItem({
+      icon: '\u2702',
+      label: 'Ungroup section',
+      onSelect: () => {
+        this.ungroupSection(sectionId);
+        this._hideContextMenu();
+      },
+    }));
+
+    menu.appendChild(this._createContextMenuItem({
+      icon: '\u270E',
+      label: 'Rename',
+      onSelect: () => {
+        const section = this._sections.get(sectionId);
+        if (section) section._enterTitleEdit();
+        this._hideContextMenu();
+      },
+    }));
+
+    this._mountContextMenu(menu, clientX, clientY);
   }
 
   registerCardType(type, CardClass) {
@@ -760,6 +1086,7 @@ class PaneManager {
   }
 
   _handlePaneMutation(paneId) {
+    this._refreshSectionBounds();
     this._persistLayout();
     if (this.panes.get(paneId)?.cardType === 'terminal') {
       this._syncRuntimeFromPane(paneId);
@@ -802,6 +1129,12 @@ class PaneManager {
         this._refreshWorkspaceCards();
       },
       onRequestFocusCard: (paneId) => this.setActive(paneId),
+      onCreateCard: (type, options) => this.createCard(type, options),
+      onCreateCardBatch: (cardDefs) => this.createCardBatch(cardDefs),
+      onGetCardData: (paneId) => {
+        const p = this.panes.get(paneId);
+        return p ? { ...p.getPersistData(), title: p.getTitle(), type: p.cardType, sessionId: p.data?.sessionId } : null;
+      },
     });
     pane.hydrateUiState?.(data);
     pane.onGroupDragStart = (paneId) => this._beginSelectedGroupDrag(paneId);
@@ -842,8 +1175,37 @@ class PaneManager {
       type,
       persist: options.persist ?? true,
     });
-    this.setActive(pane.paneId);
+    if (!options.skipActivate) {
+      this.setActive(pane.paneId);
+    }
     return pane;
+  }
+
+  /**
+   * Create multiple cards in a single batch, persisting only once at the end.
+   * @param {Array<{type: string, options: object}>} cardDefs - array of { type, options }
+   * @returns {Array} created pane instances
+   */
+  createCardBatch(cardDefs) {
+    const panes = [];
+    for (const { type, options = {} } of cardDefs) {
+      if (!options.bounds) {
+        const spawnConfig = CardRegistry.getSpawnBounds(type);
+        if (spawnConfig) {
+          options.bounds = this._getSpawnBounds(spawnConfig) || undefined;
+        }
+      }
+      const pane = this._createPane({
+        ...options,
+        type,
+        persist: false,
+      });
+      panes.push(pane);
+    }
+    // Single persist for the entire batch
+    this._persistLayout();
+    this._refreshWorkspaceCards();
+    return panes;
   }
 
   setActive(id, { preserveDomFocus = false, preserveSelection = false } = {}) {
@@ -906,6 +1268,13 @@ class PaneManager {
     this._hideContextMenu();
     this._removeSelectedPaneId(id);
 
+    // Remove from any section
+    for (const section of this._sections.values()) {
+      section.removePaneId(id);
+    }
+    this._pruneEmptySections();
+    this._refreshSectionBounds();
+
     const wasActive = this.activePaneId === id;
     pane.dispose();
     this.panes.delete(id);
@@ -938,6 +1307,7 @@ class PaneManager {
           ...(pane.getUiPersistData?.() || {}),
         },
       })),
+      sections: Array.from(this._sections.values()).map((s) => s.toJSON()),
     };
 
     this.ws.send(JSON.stringify({
@@ -951,6 +1321,10 @@ class PaneManager {
     if (this._hydrated) return;
     this._hydrated = true;
     this._setSelectedPaneIds([]);
+
+    // Clear existing sections
+    for (const section of this._sections.values()) section.dispose();
+    this._sections.clear();
 
     for (const pane of this.panes.values()) {
       pane.dispose();
@@ -979,6 +1353,7 @@ class PaneManager {
         : state.panes[state.panes.length - 1].id;
 
       this.setActive(restoredActiveId);
+      this._hydrateSections(state.sections);
       return;
     }
 
@@ -996,11 +1371,25 @@ class PaneManager {
 
   _getWorkspaceState() {
     const terminals = this._getTerminalOverview();
-    const cards = Array.from(this.panes.values()).map((pane) => ({
-      id: pane.paneId,
-      type: pane.cardType,
-      title: pane.getTitle(),
-    }));
+    const cards = Array.from(this.panes.values()).map((pane) => {
+      const entry = {
+        id: pane.paneId,
+        type: pane.cardType,
+        title: pane.getTitle(),
+      };
+      // Expose mission-specific data for Input/Prompt/Output Cards
+      if (pane.cardType === 'mission' && pane.data) {
+        entry.sessionId = pane.data.sessionId;
+        entry.status = pane.data.status;
+        entry.parentInputId = pane.data.parentInputId || '';
+        entry.executionPrompt = pane.data.executionPrompt || '';
+        entry.missionContext = typeof pane.getMissionContext === 'function' ? pane.getMissionContext() : '';
+        // Last result text for Output Card
+        const lastResult = pane.data.claudeMessages?.filter(m => m.type === 'result').pop();
+        entry.lastResult = lastResult?.result || '';
+      }
+      return entry;
+    });
 
     return {
       activePaneId: this.activePaneId,
@@ -1010,12 +1399,17 @@ class PaneManager {
   }
 
   _refreshWorkspaceCards() {
-    const workspaceState = this._getWorkspaceState();
-    for (const pane of this.panes.values()) {
-      if (pane.receiveWorkspaceState) {
-        pane.receiveWorkspaceState(workspaceState);
+    if (this._refreshWorkspaceFrame) return;
+    const schedule = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (fn) => setTimeout(fn, 0);
+    this._refreshWorkspaceFrame = schedule(() => {
+      this._refreshWorkspaceFrame = null;
+      const workspaceState = this._getWorkspaceState();
+      for (const pane of this.panes.values()) {
+        if (pane.receiveWorkspaceState) {
+          pane.receiveWorkspaceState(workspaceState);
+        }
       }
-    }
+    });
   }
 
   _applyRemoteCardCreate(message) {

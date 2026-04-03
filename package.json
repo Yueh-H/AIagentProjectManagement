@@ -1,6 +1,6 @@
 {
   "name": "web-terminal",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Web-based terminal emulator with split panes",
   "scripts": {
     "start": "node server/index.js",

@@ -2,6 +2,8 @@ function normalizeAgentOutputData(data = {}) {
   return {
     sourcePaneId: typeof data.sourcePaneId === 'string' ? data.sourcePaneId : '',
     agentName: typeof data.agentName === 'string' ? data.agentName : '',
+    sessionId: typeof data.sessionId === 'string' ? data.sessionId : '',
+    claudeMessages: Array.isArray(data.claudeMessages) ? data.claudeMessages : [],
   };
 }
 
@@ -70,7 +72,23 @@ class AgentOutputCard extends BaseCard {
     });
     this.agentNameField.root.appendChild(this.agentNameInputEl);
 
-    this.settingsEl.append(this.sourceField.root, this.agentNameField.root);
+    this.sessionField = this._createFieldShell('Claude Session ID (optional)');
+    this.sessionInputEl = document.createElement('input');
+    this.sessionInputEl.type = 'text';
+    this.sessionInputEl.className = 'agent-card-input';
+    this.sessionInputEl.placeholder = 'Paste session ID from Prompt Card to receive structured output';
+    this.sessionInputEl.value = this.data.sessionId;
+    this.sessionInputEl.spellcheck = false;
+    this.sessionInputEl.addEventListener('pointerdown', () => {
+      this._requestCardFocus({ preserveDomFocus: true });
+    });
+    this.sessionInputEl.addEventListener('input', () => {
+      this.data.sessionId = this.sessionInputEl.value.trim();
+      this.requestPersist();
+    });
+    this.sessionField.root.appendChild(this.sessionInputEl);
+
+    this.settingsEl.append(this.sourceField.root, this.agentNameField.root, this.sessionField.root);
 
     this.summaryEl = document.createElement('section');
     this.summaryEl.className = 'agent-card-summary';
@@ -180,6 +198,140 @@ class AgentOutputCard extends BaseCard {
     this.summaryPreviewEl.textContent = preview;
   }
 
+  handleMessage(msg) {
+    // Only process claude messages that match our sessionId
+    if (!this.data.sessionId) return;
+
+    if (msg.type === 'claude-data' && msg.sessionId === this.data.sessionId) {
+      this._appendClaudeMessage(msg.data);
+      return;
+    }
+
+    if (msg.type === 'claude-status' && msg.sessionId === this.data.sessionId) {
+      if (msg.status === 'running') {
+        this._setSummaryState({
+          tone: 'running',
+          status: 'Running',
+          title: `${this.data.agentName || 'Claude'} is thinking...`,
+          preview: 'Processing prompt via claude CLI session...',
+        });
+      } else if (msg.status === 'done') {
+        this._setSummaryState({
+          tone: 'idle',
+          status: 'Done',
+          title: `${this.data.agentName || 'Claude'} — session ${this.data.sessionId}`,
+          preview: `Completed (exit code ${msg.code ?? 0})`,
+        });
+      }
+      return;
+    }
+
+    if (msg.type === 'claude-error' && msg.sessionId === this.data.sessionId) {
+      this._appendClaudeMessage({ type: 'error', text: msg.message });
+    }
+  }
+
+  _appendClaudeMessage(obj) {
+    this.data.claudeMessages.push(obj);
+    // Keep last 200 messages
+    if (this.data.claudeMessages.length > 200) {
+      this.data.claudeMessages = this.data.claudeMessages.slice(-200);
+    }
+    this._renderClaudeOutput();
+  }
+
+  _renderClaudeOutput() {
+    this.outputEl.innerHTML = '';
+
+    if (!this.data.claudeMessages.length) {
+      this.outputEl.textContent = 'Waiting for Claude session output...';
+      return;
+    }
+
+    for (const msg of this.data.claudeMessages) {
+      const el = document.createElement('div');
+
+      if (msg.type === 'assistant') {
+        // Assistant text message
+        const content = msg.message?.content;
+        if (!content) continue;
+
+        if (Array.isArray(content)) {
+          for (const block of content) {
+            if (block.type === 'text' && block.text) {
+              el.className = 'agent-block agent-block-agent';
+              const label = document.createElement('span');
+              label.className = 'agent-block-label';
+              label.textContent = '\u23FA Agent';
+              const text = document.createElement('pre');
+              text.className = 'agent-block-text';
+              text.textContent = block.text;
+              el.append(label, text);
+            }
+          }
+        } else if (typeof content === 'string') {
+          el.className = 'agent-block agent-block-agent';
+          const label = document.createElement('span');
+          label.className = 'agent-block-label';
+          label.textContent = '\u23FA Agent';
+          const text = document.createElement('pre');
+          text.className = 'agent-block-text';
+          text.textContent = content;
+          el.append(label, text);
+        }
+      } else if (msg.type === 'tool_use' || msg.type === 'tool_result') {
+        el.className = 'agent-block agent-block-tool';
+        const label = document.createElement('span');
+        label.className = 'agent-block-label';
+        label.textContent = msg.type === 'tool_use'
+          ? `\u{1F527} ${msg.tool?.name || msg.name || 'Tool'}`
+          : '\u{1F4E6} Result';
+        const text = document.createElement('pre');
+        text.className = 'agent-block-text';
+        if (msg.type === 'tool_use') {
+          text.textContent = JSON.stringify(msg.tool?.input || msg.input || {}, null, 2);
+        } else {
+          const content = msg.content || msg.output || '';
+          text.textContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+        }
+        el.append(label, text);
+      } else if (msg.type === 'result') {
+        el.className = 'agent-block agent-block-agent';
+        const label = document.createElement('span');
+        label.className = 'agent-block-label';
+        label.textContent = '\u2705 Result';
+        const text = document.createElement('pre');
+        text.className = 'agent-block-text';
+        text.textContent = typeof msg.result === 'string' ? msg.result : JSON.stringify(msg.result, null, 2);
+        el.append(label, text);
+      } else if (msg.type === 'error') {
+        el.className = 'agent-block agent-block-error';
+        const label = document.createElement('span');
+        label.className = 'agent-block-label';
+        label.textContent = '\u274C Error';
+        const text = document.createElement('pre');
+        text.className = 'agent-block-text';
+        text.textContent = msg.text || msg.message || JSON.stringify(msg);
+        el.append(label, text);
+      } else if (msg.type === 'raw') {
+        el.className = 'agent-block agent-block-system';
+        const text = document.createElement('pre');
+        text.className = 'agent-block-text';
+        text.textContent = msg.text;
+        el.append(text);
+      } else {
+        // Unknown type — show raw JSON
+        continue;
+      }
+
+      if (el.children.length) {
+        this.outputEl.appendChild(el);
+      }
+    }
+
+    this.outputEl.scrollTop = this.outputEl.scrollHeight;
+  }
+
   _renderOutput(rawOutput) {
     this.outputEl.innerHTML = '';
 
@@ -261,17 +413,37 @@ class AgentOutputCard extends BaseCard {
   }
 
   _renderSourceState() {
-    const source = this._getSelectedTerminal();
     const agentLabel = this.data.agentName.trim() || 'Linked Agent';
 
-    if (!source) {
+    // If this card has a Claude session and has received messages, show those
+    if (this.data.sessionId && this.data.claudeMessages.length > 0) {
+      this._renderClaudeOutput();
+      return;
+    }
+
+    const source = this._getSelectedTerminal();
+
+    if (!source && !this.data.sessionId) {
       this._setSummaryState({
         tone: 'muted',
         status: 'Waiting',
         title: `${agentLabel} is not linked yet.`,
-        preview: 'Pick a terminal source to stream CLI agent output into this card.',
+        preview: 'Pick a terminal source or set a Claude Session ID.',
       });
       this._renderOutput('');
+      this.focusButtonEl.disabled = true;
+      return;
+    }
+
+    if (!source && this.data.sessionId) {
+      this._setSummaryState({
+        tone: 'idle',
+        status: 'Session Ready',
+        title: `${agentLabel} — session ${this.data.sessionId}`,
+        preview: 'Waiting for prompts via Prompt Input card...',
+      });
+      this.outputEl.innerHTML = '';
+      this.outputEl.textContent = 'Claude session linked. Send a prompt to see output here.';
       this.focusButtonEl.disabled = true;
       return;
     }
@@ -329,12 +501,15 @@ class AgentOutputCard extends BaseCard {
     return {
       sourcePaneId: this.data.sourcePaneId,
       agentName: this.data.agentName,
+      sessionId: this.data.sessionId,
+      // Don't persist claudeMessages — they can be large and are ephemeral
     };
   }
 
   hydratePersistedData(data = {}) {
     this.data = normalizeAgentOutputData(data);
     this.agentNameInputEl.value = this.data.agentName;
+    this.sessionInputEl.value = this.data.sessionId;
     this._syncSourceOptions();
     this._renderSourceState();
   }
